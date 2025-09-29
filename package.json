@@ -1,0 +1,65 @@
+{
+  "name": "mobx-vue-bridge",
+  "version": "1.0.2",
+  "description": "A bridge between MobX observables and Vue 3 reactivity system, enabling seamless two-way data binding and state synchronization.",
+  "main": "src/mobxVueBridge.js",
+  "module": "src/mobxVueBridge.js",
+  "types": "src/mobxVueBridge.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/mobxVueBridge.js",
+      "require": "./src/mobxVueBridge.js"
+    }
+  },
+  "files": [
+    "src/",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "prepublishOnly": "npm test && node scripts/pre-publish.js",
+    "publish:dry": "npm publish --dry-run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/visaruruqi/mobx-vue-bridge.git"
+  },
+  "keywords": [
+    "mobx",
+    "vue",
+    "vue3",
+    "reactivity",
+    "state-management",
+    "bridge",
+    "observable",
+    "reactive",
+    "two-way-binding",
+    "composition-api"
+  ],
+  "author": "Visar Uruqi",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/visaruruqi/mobx-vue-bridge/issues"
+  },
+  "homepage": "https://github.com/visaruruqi/mobx-vue-bridge#readme",
+  "peerDependencies": {
+    "vue": "^3.0.0",
+    "mobx": "^6.0.0"
+  },
+  "dependencies": {
+    "mobx-utils": "^6.0.0",
+    "clone": "^2.1.2"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "@vitest/coverage-v8": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
