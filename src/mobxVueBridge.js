@@ -12,6 +12,11 @@ import clone from 'clone';
  * @returns {object} Vue reactive state object
  */
 export function useMobxBridge(mobxObject, options = {}) {
+  // Validate mobxObject parameter
+  if (!mobxObject || typeof mobxObject !== 'object') {
+    throw new Error('useMobxBridge requires a valid MobX observable object as the first parameter');
+  }
+  
   const safeOptions = options || {};
   // Use explicit boolean conversion to handle truthy/falsy values properly
   const allowDirectMutation = safeOptions.allowDirectMutation !== undefined 
@@ -127,7 +132,7 @@ export function useMobxBridge(mobxObject, options = {}) {
   const updatingFromMobx = new Set();
   const updatingFromVue = new Set();
 
-  const isEqual = (a, b) => {
+  const isEqual = (a, b, visited = new WeakSet()) => {
     if (Object.is(a, b)) return true;
     
     // Handle null/undefined cases
@@ -139,10 +144,14 @@ export function useMobxBridge(mobxObject, options = {}) {
     // For primitives, Object.is should have caught them
     if (typeof a !== 'object') return false;
     
+    // Check for circular references
+    if (visited.has(a)) return true;
+    visited.add(a);
+    
     // Fast array comparison
     if (Array.isArray(a) && Array.isArray(b)) {
       if (a.length !== b.length) return false;
-      return a.every((val, i) => isEqual(val, b[i]));
+      return a.every((val, i) => isEqual(val, b[i], visited));
     }
     
     // Fast object comparison - check keys first
@@ -154,7 +163,7 @@ export function useMobxBridge(mobxObject, options = {}) {
     if (!aKeys.every(key => bKeys.includes(key))) return false;
     
     // Check values (recursive)
-    return aKeys.every(key => isEqual(a[key], b[key]));
+    return aKeys.every(key => isEqual(a[key], b[key], visited));
   };
 
   // Warning helpers to reduce duplication
