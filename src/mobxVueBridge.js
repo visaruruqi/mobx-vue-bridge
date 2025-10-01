@@ -182,11 +182,22 @@ export function useMobxBridge(mobxObject, options = {}) {
         return result;
       },
       set: (target, key, val) => {
+        // Check if direct mutation is allowed
+        if (!allowDirectMutation) {
+          warnDirectMutation(`${prop}.${String(key)}`);
+          return false;
+        }
+        
         target[key] = val;
         // Update the Vue ref to trigger reactivity
         propertyRefs[prop].value = clone(propertyRefs[prop].value);
         // Update MobX immediately
-        mobxObject[prop] = clone(propertyRefs[prop].value);
+        updatingFromVue.add(prop);
+        try {
+          mobxObject[prop] = clone(propertyRefs[prop].value);
+        } finally {
+          updatingFromVue.delete(prop);
+        }
         return true;
       }
     });
@@ -216,7 +227,12 @@ export function useMobxBridge(mobxObject, options = {}) {
             }
             // ALSO update MobX immediately (synchronous)
             if (!isEqual(mobxObject[prop], cloned)) {
-              mobxObject[prop] = cloned;
+              updatingFromVue.add(prop);
+              try {
+                mobxObject[prop] = cloned;
+              } finally {
+                updatingFromVue.delete(prop);
+              }
             }
           }
         : () => warnDirectMutation(prop),
@@ -254,11 +270,14 @@ export function useMobxBridge(mobxObject, options = {}) {
             // Update both refs
             setterRefs[prop].value = value;
             // Call the MobX setter immediately
+            updatingFromVue.add(prop);
             try {
               mobxObject[prop] = value;
               // The getter ref will be updated by the reaction
             } catch (error) {
               console.warn(`Failed to set property '${prop}':`, error);
+            } finally {
+              updatingFromVue.delete(prop);
             }
           }
         : () => warnDirectMutation(prop),
@@ -303,10 +322,13 @@ export function useMobxBridge(mobxObject, options = {}) {
             setterRefs[prop].value = value;
             
             // Call the MobX setter immediately
+            updatingFromVue.add(prop);
             try {
               mobxObject[prop] = value;
             } catch (error) {
               console.warn(`Failed to set property '${prop}':`, error);
+            } finally {
+              updatingFromVue.delete(prop);
             }
           }
         : () => warnSetterMutation(prop),
