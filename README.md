@@ -215,6 +215,33 @@ const state = useMobxBridge(appStore)
 
 ## 🔧 Advanced Features
 
+### Configuration Options
+
+The bridge accepts an optional configuration object to customize its behavior:
+
+```javascript
+const state = useMobxBridge(mobxObject, {
+  allowDirectMutation: true  // default: true
+})
+```
+
+#### `allowDirectMutation` (boolean)
+Controls whether direct mutations are allowed on the Vue state:
+- `true` (default): Allows `state.name = 'New Name'`
+- `false`: Mutations must go through MobX actions
+
+```javascript
+// Allow direct mutations (default)
+const state = useMobxBridge(presenter, { allowDirectMutation: true })
+state.name = 'John' // ✅ Works
+
+// Disable direct mutations (action-only mode)
+const state = useMobxBridge(presenter, { allowDirectMutation: false })
+state.name = 'John' // ❌ Warning: use actions instead
+presenter.setName('John') // ✅ Works
+```
+- ✅ You can use `await nextTick()` when needed for immediate reads
+
 ### Deep Reactivity
 The bridge automatically handles deep changes in objects and arrays:
 
@@ -223,6 +250,50 @@ The bridge automatically handles deep changes in objects and arrays:
 state.user.profile.name = 'New Name'  // Object mutation
 state.todos.push(newTodo)             // Array mutation
 state.settings.colors[0] = '#FF0000'  // Nested array mutation
+```
+
+**Note on Async Behavior:** Nested mutations (via the deep proxy) are batched using `queueMicrotask()` to prevent corruption during array operations like `shift()`, `unshift()`, and `splice()`. This ensures data correctness. If you need immediate access to updated values after nested mutations in the same function, use Vue's `nextTick()`:
+
+```javascript
+import { nextTick } from 'vue'
+
+state.items.push(newItem)
+await nextTick()  // Wait for batched update to complete
+console.log(state.items)  // Now updated
+```
+
+**However, Vue templates, computed properties, and watchers work automatically without `nextTick()`:**
+
+```vue
+<template>
+  <!-- Auto-updates, no nextTick needed -->
+  <div>{{ state.items.length }}</div>
+</template>
+
+<script setup>
+// Computed auto-updates, no nextTick needed
+const itemCount = computed(() => state.items.length)
+
+// Watcher auto-fires, no nextTick needed
+watch(() => state.items, (newItems) => {
+  console.log('Items changed:', newItems)
+})
+</script>
+```
+
+Top-level property assignments are synchronous:
+```javascript
+state.count = 42           // Immediate (sync)
+state.items = [1, 2, 3]    // Immediate (sync)
+state.items.push(4)        // Batched (async - requires nextTick for immediate read)
+```
+
+**Best Practice:** Keep business logic in your MobX Presenter. When you mutate via the Presenter, everything is synchronous:
+
+```javascript
+// ✅ Presenter pattern - always synchronous, no nextTick needed
+presenter.items.push(newItem)
+console.log(presenter.items)  // Immediately updated!
 ```
 
 ### Error Handling

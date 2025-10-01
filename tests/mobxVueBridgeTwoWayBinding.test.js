@@ -20,10 +20,12 @@ vi.mock('vue', () => ({
       source._watcher = callback
     }
     return () => {} // cleanup function
-  })
+  }),
+  nextTick: vi.fn(() => Promise.resolve())
 }))
 
 import { useMobxBridge } from '../mobxVueBridge'
+import { nextTick } from 'vue'
 
 describe('MobX-Vue Bridge Two-Way Binding', () => {
   test('should sync Vue → MobX changes', () => {
@@ -112,7 +114,7 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
     expect(state.count).toBe(50)
   })
 
-  test('should handle nested objects', () => {
+  test('should handle nested objects', async () => {
     const presenter = makeAutoObservable({
       form: {
         name: '',
@@ -124,15 +126,17 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
     
     // Test nested object changes
     state.form.name = 'John Doe'
+    await nextTick()
     expect(presenter.form.name).toBe('John Doe')
     expect(state.form.name).toBe('John Doe')
     
     state.form.email = 'john@example.com'
+    await nextTick()
     expect(presenter.form.email).toBe('john@example.com')
     expect(state.form.email).toBe('john@example.com')
   })
 
-  test('should handle arrays', () => {
+  test('should handle arrays', async () => {
     const presenter = makeAutoObservable({
       items: []
     })
@@ -146,11 +150,12 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
     
     // Test array mutations
     state.items.push('item3')
+    await nextTick()
     expect(presenter.items).toEqual(['item1', 'item2', 'item3'])
     expect(state.items).toEqual(['item1', 'item2', 'item3'])
   })
 
-  test('should verify array assignment and array push is working in two ways', () => {
+  test('should verify array assignment and array push is working in two ways', async () => {
     const presenter = makeAutoObservable({
       count: 0,
       items: []
@@ -168,6 +173,7 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
     
     // Test array mutation
     state.items.push('item3')
+    await nextTick()
     expect(presenter.items).toEqual(['item1', 'item2', 'item3'])
     
     // The fact that these tests pass means markRaw is working correctly
