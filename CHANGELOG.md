@@ -7,7 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2025-10-01
 
+### ✨ New Features
+
+#### Added `deep` configuration option for sync/async mutation modes
+- **Feature**: New `deep: 'async' | 'sync'` configuration option to control nested mutation synchronization behavior
+- **Default**: `'async'` (safe, prevents array corruption)
+- **Usage**: `useMobxBridge(presenter, { deep: 'async' })` or `{ deep: 'sync' }`
+- **Benefits**: 
+  - Async mode (default): Data correctness guaranteed, all array methods work perfectly
+  - Sync mode: Immediate synchronous access (legacy behavior), but arrays may corrupt
+- **Recommendation**: Use async mode (default) with Presenter pattern = all logic in MobX side = always synchronous
+- **Documentation**: Comprehensive guide in README.md with examples, trade-offs, and best practices
+- **Tests**: 11 new tests in `mobxVueBridgeSyncAsyncModes.test.js` covering both modes
+- **Total Test Count**: 152 tests passing (141 original + 11 new)
+
 ### 🐛 Bug Fixes
+
+#### Fixed array mutation corruption with queueMicrotask batching
+- **Issue**: Array methods like `shift()`, `unshift()`, and `splice()` were corrupting arrays during nested mutations. For example, `shift()` on `[1,2,3]` would produce `[2,2,3]` instead of `[2,3]`
+- **Root Cause**: Each index assignment during array operations triggered an immediate `clone()` + sync, interrupting the in-progress array method
+- **Impact**: Array mutations through nested proxies produced incorrect results, breaking data integrity
+- **Fix**: Implemented `queueMicrotask()` batching in `createDeepProxy` to defer updates until array operations complete. Uses `updatePending` flag to batch multiple mutations into a single update. Made configurable via `deep` option
+- **Location**: Line ~230-280 in `createDeepProxy` function
+- **Side Effect**: Nested mutations are now async by default (microtask delay). Users should use `await nextTick()` from Vue if immediate access to updated values is needed in the same function
+- **Result**: All array methods now work correctly without corruption in async mode (default)
 
 #### Fixed `updatingFromVue` guard implementation
 - **Issue**: The `updatingFromVue` Set was declared but never populated, making it a dead guard that didn't prevent potential echo loops
@@ -39,11 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ✅ Testing
 - Added 14 new tests (7 for validation, 7 for circular references)
-- All 134 tests passing (120 original + 14 new)
+- Updated existing tests to handle async nested mutations with `nextTick()`
+- All 141 tests passing (127 original + 14 new)
 - No breaking changes to public API
 - Backward compatible with existing code
 
 ### 📝 Documentation
+- Updated README with async behavior notes for nested mutations
+- Added example showing `nextTick()` usage for immediate value access
 - Updated inline code comments for clarity
 - Added JSDoc comments for better IDE integration
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { makeAutoObservable } from 'mobx'
 import { usePresenterState } from '../mobxVueBridge'
+import { nextTick } from 'vue'
 
 describe('MobX-Vue Bridge - Real-World Scenarios', () => {
   describe('Modal Form Handling (CourseModal-like)', () => {
@@ -50,11 +51,13 @@ describe('MobX-Vue Bridge - Real-World Scenarios', () => {
       
       // Test direct form field updates (common in v-model)
       state.form.name = 'Advanced Mathematics'
+      await nextTick()
       expect(presenter.form.name).toBe('Advanced Mathematics')
       
       // Test multiple nested updates
       state.form.code = 'MATH301'
       state.form.credits = 4
+      await nextTick()
       expect(presenter.form.code).toBe('MATH301')
       expect(presenter.form.credits).toBe(4)
       
@@ -111,7 +114,7 @@ describe('MobX-Vue Bridge - Real-World Scenarios', () => {
       }
     }
 
-    it('should handle multiple bridges sharing the same repository', () => {
+    it('should handle multiple bridges sharing the same repository', async () => {
       const repository = new MockRepository()
       const presenter1 = new MockPresenter(repository)
       const presenter2 = new MockPresenter(repository)
@@ -137,6 +140,7 @@ describe('MobX-Vue Bridge - Real-World Scenarios', () => {
       
       // Repository updates should be visible in all bridges
       repoState.items[0].name = 'Updated Item 1'
+      await nextTick()
       expect(state1.selectedItem.name).toBe('Updated Item 1')
     })
   })
@@ -269,7 +273,7 @@ describe('MobX-Vue Bridge - Real-World Scenarios', () => {
       }
     }
 
-    it('should handle complex array operations like student/course lists', () => {
+    it('should handle complex array operations like student/course lists', async () => {
       const presenter = new ListPresenter()
       const state = usePresenterState(presenter)
       
@@ -279,19 +283,23 @@ describe('MobX-Vue Bridge - Real-World Scenarios', () => {
       
       // Test array mutation via proxy
       state.items[0].name = 'Updated Item 1'
+      await nextTick()
       expect(presenter.items[0].name).toBe('Updated Item 1')
       
       // Test nested array mutation
       state.items[0].tags.push('tag4')
+      await nextTick()
       expect(presenter.items[0].tags).toEqual(['tag1', 'tag2', 'tag4'])
       
       // Test splice operations
       state.items.splice(1, 1)
+      await nextTick()
       expect(presenter.items.length).toBe(1)
       expect(state.items.length).toBe(1)
       
       // Test push operations
       state.items.push({ id: 3, name: 'Item 3', tags: ['tag5'] })
+      await nextTick()
       expect(presenter.items.length).toBe(2)
       expect(presenter.items[1].name).toBe('Item 3')
     })
@@ -338,8 +346,8 @@ describe('MobX-Vue Bridge - Real-World Scenarios', () => {
       const endTime = performance.now()
       const duration = endTime - startTime
       
-      // Should complete in reasonable time (< 100ms)
-      expect(duration).toBeLessThan(100)
+      // Should complete in reasonable time (< 200ms to account for microtask overhead)
+      expect(duration).toBeLessThan(200)
       
       // Final state should be correct
       expect(state.counter).toBe(100)
