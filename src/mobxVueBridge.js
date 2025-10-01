@@ -12,7 +12,6 @@ import clone from 'clone';
  * @param {object} mobxObject - The MobX observable object to bridge (created with makeAutoObservable)
  * @param {object} options - Configuration options
  * @param {boolean} options.allowDirectMutation - Whether to allow direct mutation of properties (default: true)
- * @param {'async'|'sync'} options.deep - Deep mutation mode: 'async' (safe, batched) or 'sync' (immediate, may corrupt arrays) (default: 'async')
  * @returns {object} Vue reactive state object with synchronized properties, getters, setters, and methods
  * 
  * @example
@@ -34,9 +33,6 @@ import clone from 'clone';
  * 
  * const store = new UserStore()
  * const state = useMobxBridge(store)
- * 
- * // Or with sync mode (not recommended)
- * const state = useMobxBridge(store, { deep: 'sync' })
  * ```
  */
 export function useMobxBridge(mobxObject, options = {}) {
@@ -50,9 +46,6 @@ export function useMobxBridge(mobxObject, options = {}) {
   const allowDirectMutation = safeOptions.allowDirectMutation !== undefined 
     ? Boolean(safeOptions.allowDirectMutation) 
     : true; // Keep the original default of true
-  
-  // Deep mutation mode: 'async' (default, safe) or 'sync' (legacy, may corrupt arrays)
-  const deepMode = safeOptions.deep === 'sync' ? 'sync' : 'async';
   
   const vueState = reactive({});
 
@@ -217,9 +210,9 @@ export function useMobxBridge(mobxObject, options = {}) {
    * This enables mutations like state.items.push(item) to work correctly.
    * Respects the allowDirectMutation configuration for all nesting levels.
    * 
-   * Note: In async mode (default), mutations are batched via queueMicrotask to prevent 
-   * corruption during array operations like shift(), unshift(), splice() which modify 
-   * multiple indices. In sync mode, updates happen immediately but arrays may corrupt.
+   * Note: Mutations are batched via queueMicrotask to prevent corruption during 
+   * array operations like shift(), unshift(), splice() which modify multiple indices.
+   * This ensures data correctness at the cost of a microtask delay.
    * 
    * @param {object|array} value - The nested value to wrap in a proxy
    * @param {string} prop - The parent property name for error messages
@@ -232,7 +225,7 @@ export function useMobxBridge(mobxObject, options = {}) {
       return value;
     }
 
-    // Track pending updates to batch array mutations (async mode only)
+    // Track pending updates to batch array mutations
     let updatePending = false;
     
     return new Proxy(value, {
@@ -255,35 +248,22 @@ export function useMobxBridge(mobxObject, options = {}) {
         
         target[key] = val;
         
-        // Batch updates in async mode to avoid corrupting in-progress array operations
+        // Batch updates to avoid corrupting in-progress array operations
         // like shift(), unshift(), splice() which modify multiple indices synchronously
-        if (deepMode === 'async') {
-          if (!updatePending) {
-            updatePending = true;
-            queueMicrotask(() => {
-              updatePending = false;
-              // Update the Vue ref to trigger reactivity
-              propertyRefs[prop].value = clone(propertyRefs[prop].value);
-              // Update MobX immediately
-              updatingFromVue.add(prop);
-              try {
-                mobxObject[prop] = clone(propertyRefs[prop].value);
-              } finally {
-                updatingFromVue.delete(prop);
-              }
-            });
-          }
-        } else {
-          // Sync mode: immediate update (may corrupt arrays during multi-index operations)
-          // Update the Vue ref to trigger reactivity
-          propertyRefs[prop].value = clone(propertyRefs[prop].value);
-          // Update MobX immediately
-          updatingFromVue.add(prop);
-          try {
-            mobxObject[prop] = clone(propertyRefs[prop].value);
-          } finally {
-            updatingFromVue.delete(prop);
-          }
+        if (!updatePending) {
+          updatePending = true;
+          queueMicrotask(() => {
+            updatePending = false;
+            // Update the Vue ref to trigger reactivity
+            propertyRefs[prop].value = clone(propertyRefs[prop].value);
+            // Update MobX immediately
+            updatingFromVue.add(prop);
+            try {
+              mobxObject[prop] = clone(propertyRefs[prop].value);
+            } finally {
+              updatingFromVue.delete(prop);
+            }
+          });
         }
         
         return true;
