@@ -6,10 +6,34 @@ import clone from 'clone';
 /**
  * 🌉 MobX-Vue Bridge
  * 
- * @param {object} mobxObject - The MobX observable object to bridge
+ * Creates a bidirectional bridge between MobX observables and Vue 3 reactivity.
+ * Automatically synchronizes changes in both directions while preventing infinite loops.
+ * 
+ * @param {object} mobxObject - The MobX observable object to bridge (created with makeAutoObservable)
  * @param {object} options - Configuration options
- * @param {boolean} options.allowDirectMutation - Whether to allow direct mutation of properties
- * @returns {object} Vue reactive state object
+ * @param {boolean} options.allowDirectMutation - Whether to allow direct mutation of properties (default: true)
+ * @returns {object} Vue reactive state object with synchronized properties, getters, setters, and methods
+ * 
+ * @example
+ * ```javascript
+ * import { useMobxBridge } from 'mobx-vue-bridge'
+ * import { makeAutoObservable } from 'mobx'
+ * 
+ * class UserStore {
+ *   constructor() {
+ *     this.name = 'John'
+ *     this.age = 30
+ *     makeAutoObservable(this)
+ *   }
+ *   
+ *   get displayName() {
+ *     return `${this.name} (${this.age})`
+ *   }
+ * }
+ * 
+ * const store = new UserStore()
+ * const state = useMobxBridge(store)
+ * ```
  */
 export function useMobxBridge(mobxObject, options = {}) {
   // Validate mobxObject parameter
@@ -132,6 +156,15 @@ export function useMobxBridge(mobxObject, options = {}) {
   const updatingFromMobx = new Set();
   const updatingFromVue = new Set();
 
+  /**
+   * Deep equality comparison with circular reference protection.
+   * Uses WeakSet to track visited objects and prevent infinite recursion.
+   * 
+   * @param {any} a - First value to compare
+   * @param {any} b - Second value to compare  
+   * @param {WeakSet} visited - Set of visited objects to prevent circular references
+   * @returns {boolean} True if values are deeply equal
+   */
   const isEqual = (a, b, visited = new WeakSet()) => {
     if (Object.is(a, b)) return true;
     
@@ -171,7 +204,14 @@ export function useMobxBridge(mobxObject, options = {}) {
   const warnSetterMutation = (prop) => console.warn(`Direct mutation of setter '${prop}' is disabled`);
   const warnMethodAssignment = (prop) => console.warn(`Cannot assign to method '${prop}'`);
 
-  // Helper to create deep proxies for nested objects and arrays
+  /**
+   * Creates deep proxies for nested objects and arrays to enable reactive mutations.
+   * Respects the allowDirectMutation configuration for all nesting levels.
+   * 
+   * @param {object|array} value - The nested value to wrap in a proxy
+   * @param {string} prop - The parent property name for error messages
+   * @returns {Proxy} Proxied object/array with reactive mutation handling
+   */
   const createDeepProxy = (value, prop) => {
     // Don't proxy built-in objects that should remain unchanged
     if (value instanceof Date || value instanceof RegExp || value instanceof Map || 

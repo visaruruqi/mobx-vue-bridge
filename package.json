@@ -22,7 +22,11 @@
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
-    "prepublishOnly": "npm test && node scripts/pre-publish.js",
+    "test:run": "vitest --run",
+    "lint": "echo 'No linter configured yet. Consider adding ESLint.'",
+    "format": "echo 'No formatter configured yet. Consider adding Prettier.'",
+    "validate": "npm run test:run",
+    "prepublishOnly": "npm run validate && node scripts/pre-publish.js",
     "publish:dry": "npm publish --dry-run"
   },
   "repository": {
@@ -47,6 +51,10 @@
     "url": "https://github.com/visaruruqi/mobx-vue-bridge/issues"
   },
   "homepage": "https://github.com/visaruruqi/mobx-vue-bridge#readme",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/visaruruqi"
+  },
   "peerDependencies": {
     "vue": "^3.0.0",
     "mobx": "^6.0.0"
