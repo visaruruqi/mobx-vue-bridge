@@ -27,14 +27,20 @@ describe('MobX-Vue Bridge - Error Handling & Edge Cases', () => {
   })
 
   it('should handle computed properties that throw during initialization', () => {
-    const presenter = makeAutoObservable({
-      userData: null,
+    class InitErrorStore {
+      userData = null
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       get fullName() {
         // This will throw when userData is null
         return this.userData.firstName + ' ' + this.userData.lastName
       }
-    })
+    }
+    
+    const presenter = new InitErrorStore()
 
     // Should not throw during bridge creation
     expect(() => {
@@ -45,13 +51,19 @@ describe('MobX-Vue Bridge - Error Handling & Edge Cases', () => {
   })
 
   it('should handle computed properties that throw during updates', () => {
-    const presenter = makeAutoObservable({
-      userData: { firstName: 'John', lastName: 'Doe' },
+    class UpdateErrorStore {
+      userData = { firstName: 'John', lastName: 'Doe' }
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       get fullName() {
         return this.userData.firstName + ' ' + this.userData.lastName
       }
-    })
+    }
+    
+    const presenter = new UpdateErrorStore()
 
     const state = useMobxBridge(presenter)
     
@@ -66,12 +78,16 @@ describe('MobX-Vue Bridge - Error Handling & Edge Cases', () => {
   })
 
   it('should handle setters that throw errors', () => {
-    const presenter = makeAutoObservable({
-      _value: 0,
+    class SetterErrorStore {
+      _value = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       get value() {
         return this._value
-      },
+      }
       
       set value(val) {
         if (val < 0) {
@@ -79,7 +95,9 @@ describe('MobX-Vue Bridge - Error Handling & Edge Cases', () => {
         }
         this._value = val
       }
-    })
+    }
+    
+    const presenter = new SetterErrorStore()
 
     const state = useMobxBridge(presenter, { allowDirectMutation: true })
     
@@ -117,10 +135,17 @@ describe('MobX-Vue Bridge - Error Handling & Edge Cases', () => {
 
   it('should handle objects with symbol properties', () => {
     const symbolProp = Symbol('test')
-    const presenter = makeAutoObservable({
-      normalProp: 'test',
-      [symbolProp]: 'symbol value'
-    })
+    
+    class SymbolStore {
+      normalProp = 'test'
+      
+      constructor() {
+        this[symbolProp] = 'symbol value'
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new SymbolStore()
 
     // Should handle symbol properties gracefully
     expect(() => {
@@ -133,9 +158,16 @@ describe('MobX-Vue Bridge - Error Handling & Edge Cases', () => {
 
   it('should handle frozen/sealed objects', () => {
     const frozenObj = Object.freeze({ value: 'frozen' })
-    const presenter = makeAutoObservable({
-      frozenProp: frozenObj
-    })
+    
+    class FrozenStore {
+      frozenProp = frozenObj
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new FrozenStore()
 
     expect(() => {
       const state = useMobxBridge(presenter)
@@ -194,9 +226,15 @@ describe('MobX-Vue Bridge - Error Handling & Edge Cases', () => {
       deep = { level: i, nested: deep }
     }
     
-    const presenter = makeAutoObservable({
-      deepObject: deep
-    })
+    class DeepNestedStore {
+      deepObject = deep
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new DeepNestedStore()
 
     expect(() => {
       const state = useMobxBridge(presenter)
@@ -206,13 +244,19 @@ describe('MobX-Vue Bridge - Error Handling & Edge Cases', () => {
   })
 
   it('should handle null and undefined property values', () => {
-    const presenter = makeAutoObservable({
-      nullProp: null,
-      undefinedProp: undefined,
-      emptyStringProp: '',
-      zeroProp: 0,
-      falseProp: false
-    })
+    class NullUndefinedStore {
+      nullProp = null
+      undefinedProp = undefined
+      emptyStringProp = ''
+      zeroProp = 0
+      falseProp = false
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new NullUndefinedStore()
 
     expect(() => {
       const state = useMobxBridge(presenter)

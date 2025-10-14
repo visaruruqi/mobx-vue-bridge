@@ -22,35 +22,41 @@ describe('MobX-Vue Bridge Two-Way Binding - Documentation & Future Tests', () =>
     // This test documents the expected behavior for future implementation
     
     // Create a presenter-like object with observable properties
-    const presenter = makeAutoObservable({
-      search: '',
-      modalOpen: false,
-      selected: null,
-      form: {
+    class PresenterStore {
+      search = ''
+      modalOpen = false
+      selected = null
+      form = {
         name: '',
         email: ''
-      },
+      }
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       // Computed property
       get hasSelection() {
         return this.selected !== null
-      },
+      }
       
       // Actions
       setSearch(value) {
         this.search = value
-      },
+      }
       
       openModal(item = null) {
         this.selected = item
         this.modalOpen = true
-      },
+      }
       
       closeModal() {
         this.modalOpen = false
         this.selected = null
       }
-    })
+    }
+    
+    const presenter = new PresenterStore()
 
     // Create the bridge (this would normally be done in a Vue component)
     const state = useMobxBridge(presenter)
@@ -118,13 +124,19 @@ describe('MobX-Vue Bridge Two-Way Binding - Documentation & Future Tests', () =>
     // SKIPPED: Requires Vue component context
     // This test documents expected behavior for different data types
     
-    const presenter = makeAutoObservable({
-      count: 0,
-      price: 0.0,
-      isActive: false,
-      tags: [],
-      config: {}
-    })
+    class PropertyTypesStore {
+      count = 0
+      price = 0.0
+      isActive = false
+      tags = []
+      config = {}
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new PropertyTypesStore()
 
     const state = useMobxBridge(presenter)
 
@@ -159,9 +171,15 @@ describe('MobX-Vue Bridge Two-Way Binding - Documentation & Future Tests', () =>
   it('should document the two-way binding implementation', () => {
     // This test documents how the two-way binding works
     
-    const presenter = makeAutoObservable({
-      search: 'initial'
-    })
+    class BindingStore {
+      search = 'initial'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new BindingStore()
 
     // The two-way binding is implemented using Object.defineProperty
     const state = {}
@@ -192,12 +210,18 @@ describe('MobX-Vue Bridge Two-Way Binding - Documentation & Future Tests', () =>
   it('should document v-model compatibility', () => {
     // This test documents how v-model works with the bridge
     
-    const presenter = makeAutoObservable({
-      form: {
+    class VModelStore {
+      form = {
         name: '',
         email: ''
       }
-    })
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new VModelStore()
 
     // Create two-way binding for nested properties
     const state = {}
@@ -231,13 +255,19 @@ describe('MobX-Vue Bridge Two-Way Binding - Documentation & Future Tests', () =>
   it('should document computed property behavior', () => {
     // This test documents why computed properties are read-only
     
-    const presenter = makeAutoObservable({
-      count: 0,
+    class ComputedStore {
+      count = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       get doubled() {
         return this.count * 2
       }
-    })
+    }
+    
+    const presenter = new ComputedStore()
 
     // Create two-way binding for count, read-only for doubled
     const state = {}

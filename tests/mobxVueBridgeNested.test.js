@@ -10,8 +10,8 @@ import { makeAutoObservable } from 'mobx'
 
 describe('MobX-Vue Bridge - Deeply Nested Properties', () => {
   it('should handle deeply nested object properties', () => {
-    const presenter = makeAutoObservable({
-      user: {
+    class NestedUserStore {
+      user = {
         profile: {
           settings: {
             theme: 'light',
@@ -40,7 +40,13 @@ describe('MobX-Vue Bridge - Deeply Nested Properties', () => {
           }
         }
       }
-    })
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new NestedUserStore()
 
     // Create two-way binding for the root object
     const state = {}
@@ -99,8 +105,8 @@ describe('MobX-Vue Bridge - Deeply Nested Properties', () => {
   })
 
   it('should demonstrate the limitation of shallow binding', () => {
-    const presenter = makeAutoObservable({
-      config: {
+    class ConfigStore {
+      config = {
         api: {
           baseUrl: 'https://api.example.com',
           endpoints: {
@@ -109,7 +115,13 @@ describe('MobX-Vue Bridge - Deeply Nested Properties', () => {
           }
         }
       }
-    })
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new ConfigStore()
 
     // Create shallow binding (only for the root property)
     const state = {}
@@ -149,12 +161,18 @@ describe('MobX-Vue Bridge - Deeply Nested Properties', () => {
   })
 
   it('should work with arrays of objects', () => {
-    const presenter = makeAutoObservable({
-      items: [
+    class ItemsStore {
+      items = [
         { id: 1, name: 'Item 1', metadata: { category: 'A', tags: ['tag1'] } },
         { id: 2, name: 'Item 2', metadata: { category: 'B', tags: ['tag2'] } }
       ]
-    })
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new ItemsStore()
 
     // Create binding for the array
     const state = {}
@@ -196,8 +214,8 @@ describe('MobX-Vue Bridge - Deeply Nested Properties', () => {
 
   it('should demonstrate reactive updates in Vue context', () => {
     // This test simulates what happens in a real Vue component
-    const presenter = makeAutoObservable({
-      form: {
+    class FormStore {
+      form = {
         user: {
           personal: {
             name: '',
@@ -209,7 +227,13 @@ describe('MobX-Vue Bridge - Deeply Nested Properties', () => {
           }
         }
       }
-    })
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new FormStore()
 
     // Create the binding (this is what useMobxBridge does)
     const state = {}
@@ -249,8 +273,8 @@ describe('MobX-Vue Bridge - Deeply Nested Properties', () => {
   })
 
   it('should handle edge cases with nested properties', () => {
-    const presenter = makeAutoObservable({
-      data: {
+    class DataStore {
+      data = {
         level1: {
           level2: {
             level3: {
@@ -259,7 +283,13 @@ describe('MobX-Vue Bridge - Deeply Nested Properties', () => {
           }
         }
       }
-    })
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new DataStore()
 
     const state = {}
     Object.defineProperty(state, 'data', {

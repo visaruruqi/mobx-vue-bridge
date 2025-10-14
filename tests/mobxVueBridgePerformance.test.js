@@ -15,8 +15,12 @@ import { useMobxBridge } from '../mobxVueBridge.js'
 
 describe('MobX-Vue Bridge - Performance & Memory Tests', () => {
   it('should handle large objects efficiently with isEqual comparison', () => {
-    const presenter = makeAutoObservable({
-      largeObject: null,
+    class LargeObjectStore {
+      largeObject = null
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       initializeLargeObject() {
         // Create a large nested object
@@ -30,7 +34,9 @@ describe('MobX-Vue Bridge - Performance & Memory Tests', () => {
         }
         this.largeObject = large
       }
-    })
+    }
+    
+    const presenter = new LargeObjectStore()
 
     const state = useMobxBridge(presenter)
     
@@ -46,9 +52,15 @@ describe('MobX-Vue Bridge - Performance & Memory Tests', () => {
   })
 
   it('should not create memory leaks with proxy objects', () => {
-    const presenter = makeAutoObservable({
-      nestedData: { level1: { level2: { value: 'test' } } }
-    })
+    class NestedProxyStore {
+      nestedData = { level1: { level2: { value: 'test' } } }
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new NestedProxyStore()
 
     const state = useMobxBridge(presenter)
     
@@ -71,14 +83,21 @@ describe('MobX-Vue Bridge - Performance & Memory Tests', () => {
   })
 
   it('should handle rapid property updates efficiently', () => {
-    const presenter = makeAutoObservable({
-      counter: 0,
+    class RapidUpdateStore {
+      counter = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+      
       rapidUpdate() {
         for (let i = 0; i < 1000; i++) {
           this.counter = i
         }
       }
-    })
+    }
+    
+    const presenter = new RapidUpdateStore()
 
     const state = useMobxBridge(presenter)
     
@@ -94,16 +113,22 @@ describe('MobX-Vue Bridge - Performance & Memory Tests', () => {
   it('should handle circular reference detection in isEqual', () => {
     // Create a more realistic circular reference scenario
     // that doesn't break MobX itself
-    const presenter = makeAutoObservable({
-      obj1: { name: 'obj1', value: 1 },
-      obj2: { name: 'obj2', value: 2 },
+    class CircularRefStore {
+      obj1 = { name: 'obj1', value: 1 }
+      obj2 = { name: 'obj2', value: 2 }
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateWithSimilarObjects() {
         // Update with objects that might trigger deep equality checks
         this.obj1 = { name: 'obj1', value: 1, nested: { deep: 'value' } }
         this.obj2 = { name: 'obj2', value: 2, nested: { deep: 'value' } }
       }
-    })
+    }
+    
+    const presenter = new CircularRefStore()
 
     const state = useMobxBridge(presenter)
     
@@ -119,10 +144,16 @@ describe('MobX-Vue Bridge - Performance & Memory Tests', () => {
   it('should cleanup subscriptions properly to prevent memory leaks', () => {
     // This test documents the expected cleanup behavior
     // Currently the bridge doesn't expose subscription count for testing
-    const presenter = makeAutoObservable({
-      prop1: 'value1',
-      prop2: 'value2'
-    })
+    class CleanupStore {
+      prop1 = 'value1'
+      prop2 = 'value2'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new CleanupStore()
 
     // Test that bridge creation doesn't throw
     expect(() => {

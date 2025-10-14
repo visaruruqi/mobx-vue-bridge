@@ -15,14 +15,18 @@ import { useMobxBridge } from '../mobxVueBridge.js'
 
 describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
   it('should handle all JavaScript primitive types correctly', () => {
-    const presenter = makeAutoObservable({
-      stringProp: 'hello',
-      numberProp: 42,
-      booleanProp: true,
-      nullProp: null,
-      undefinedProp: undefined,
-      bigintProp: BigInt(123),
-      symbolProp: Symbol('test'),
+    class PrimitivesStore {
+      stringProp = 'hello'
+      numberProp = 42
+      booleanProp = true
+      nullProp = null
+      undefinedProp = undefined
+      bigintProp = BigInt(123)
+      symbolProp = Symbol('test')
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateTypes() {
         this.stringProp = 'world'
@@ -31,7 +35,9 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
         this.nullProp = 'not null anymore'
         this.undefinedProp = 'defined now'
       }
-    })
+    }
+    
+    const presenter = new PrimitivesStore()
 
     const state = useMobxBridge(presenter)
     
@@ -55,9 +61,16 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
 
   it('should handle Date objects correctly', () => {
     const now = new Date()
-    const presenter = makeAutoObservable({
-      dateProperty: now
-    })
+    
+    class DateStore {
+      dateProperty = now
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new DateStore()
 
     const state = useMobxBridge(presenter)
     
@@ -73,13 +86,20 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
 
   it('should handle RegExp objects correctly', () => {
     const regex = /test\d+/gi
-    const presenter = makeAutoObservable({
-      regexProp: regex,
+    
+    class RegExpStore {
+      regexProp = regex
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateRegex() {
         this.regexProp = /new\w+/i
       }
-    })
+    }
+    
+    const presenter = new RegExpStore()
 
     const state = useMobxBridge(presenter)
     
@@ -96,15 +116,21 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
     const map = new Map([['key1', 'value1'], ['key2', 'value2']])
     const set = new Set([1, 2, 3])
     
-    const presenter = makeAutoObservable({
-      mapProp: map,
-      setProp: set,
+    class MapSetStore {
+      mapProp = map
+      setProp = set
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateCollections() {
         this.mapProp = new Map([['newKey', 'newValue']])
         this.setProp = new Set(['a', 'b', 'c'])
       }
-    })
+    }
+    
+    const presenter = new MapSetStore()
 
     const state = useMobxBridge(presenter)
     
@@ -131,13 +157,19 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
       new Date()
     ]
     
-    const presenter = makeAutoObservable({
-      mixedArray: mixedArray,
+    class MixedArrayStore {
+      mixedArray = mixedArray
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateArray() {
         this.mixedArray = [...this.mixedArray, 'new item']
       }
-    })
+    }
+    
+    const presenter = new MixedArrayStore()
 
     const state = useMobxBridge(presenter)
     
@@ -166,9 +198,15 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
       }
     }
     
-    const presenter = makeAutoObservable({
-      complexData: complexData
-    })
+    class ComplexDataStore {
+      complexData = complexData
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new ComplexDataStore()
 
     const state = useMobxBridge(presenter)
     
@@ -182,20 +220,26 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
   })
 
   it('should handle type coercion correctly with isEqual', () => {
-    const presenter = makeAutoObservable({
-      numericString: '42',
-      actualNumber: 42,
-      zeroString: '0',
-      actualZero: 0,
-      emptyString: '',
-      actualFalse: false,
+    class CoercionStore {
+      numericString = '42'
+      actualNumber = 42
+      zeroString = '0'
+      actualZero = 0
+      emptyString = ''
+      actualFalse = false
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       testCoercion() {
         // These should be treated as different values
         this.numericString = 42 // string -> number
         this.actualNumber = '42' // number -> string
       }
-    })
+    }
+    
+    const presenter = new CoercionStore()
 
     const state = useMobxBridge(presenter, { allowDirectMutation: true })
     
@@ -216,20 +260,26 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
   })
 
   it('should handle function properties correctly', () => {
-    const presenter = makeAutoObservable({
-      name: 'test',
-      callback: null,
+    class FunctionStore {
+      name = 'test'
+      callback = null
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       setCallback(fn) {
         this.callback = fn
-      },
+      }
       
       executeCallback() {
         if (this.callback) {
           return this.callback(this.name)
         }
       }
-    })
+    }
+    
+    const presenter = new FunctionStore()
 
     const state = useMobxBridge(presenter)
     
@@ -255,13 +305,19 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
     
     const instance = new CustomClass('test')
     
-    const presenter = makeAutoObservable({
-      customInstance: instance,
+    class PrototypeStore {
+      customInstance = instance
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateInstance() {
         this.customInstance = new CustomClass('updated')
       }
-    })
+    }
+    
+    const presenter = new PrototypeStore()
 
     const state = useMobxBridge(presenter)
     

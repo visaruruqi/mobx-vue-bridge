@@ -12,23 +12,29 @@ import { makeAutoObservable } from 'mobx'
 describe('MobX-Vue Bridge Integration Tests', () => {
   it('should create working two-way binding using Object.defineProperty', () => {
     // Create a MobX presenter
-    const presenter = makeAutoObservable({
-      search: 'initial',
-      modalOpen: false,
-      count: 0,
+    class IntegrationStore {
+      search = 'initial'
+      modalOpen = false
+      count = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       get hasSearch() {
         return this.search.length > 0
-      },
+      }
       
       setSearch(value) {
         this.search = value
-      },
+      }
       
       increment() {
         this.count++
       }
-    })
+    }
+    
+    const presenter = new IntegrationStore()
 
     // Create the two-way binding manually (simulating what useMobxBridge does)
     const state = {}
@@ -123,13 +129,19 @@ describe('MobX-Vue Bridge Integration Tests', () => {
   })
 
   it('should work with nested object properties', () => {
-    const presenter = makeAutoObservable({
-      form: {
+    class NestedStore {
+      form = {
         name: '',
         email: '',
         age: 0
       }
-    })
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new NestedStore()
 
     // Create two-way binding for nested object
     const state = {}
@@ -165,10 +177,16 @@ describe('MobX-Vue Bridge Integration Tests', () => {
   })
 
   it('should work with array properties', () => {
-    const presenter = makeAutoObservable({
-      items: [],
-      tags: ['vue', 'mobx']
-    })
+    class ArrayStore {
+      items = []
+      tags = ['vue', 'mobx']
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new ArrayStore()
 
     // Create two-way binding for arrays
     const state = {}
@@ -213,15 +231,21 @@ describe('MobX-Vue Bridge Integration Tests', () => {
   })
 
   it('should handle different data types correctly', () => {
-    const presenter = makeAutoObservable({
-      stringValue: 'hello',
-      numberValue: 42,
-      booleanValue: false,
-      nullValue: null,
-      undefinedValue: undefined,
-      objectValue: { key: 'value' },
-      arrayValue: [1, 2, 3]
-    })
+    class DataTypesStore {
+      stringValue = 'hello'
+      numberValue = 42
+      booleanValue = false
+      nullValue = null
+      undefinedValue = undefined
+      objectValue = { key: 'value' }
+      arrayValue = [1, 2, 3]
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new DataTypesStore()
 
     // Create two-way binding for all properties
     const state = {}

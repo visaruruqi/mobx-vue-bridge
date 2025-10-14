@@ -10,18 +10,24 @@ import { makeAutoObservable } from 'mobx'
 
 describe('MobX-Vue Bridge - Binding Modes', () => {
   it('should work in two-way mode (default)', () => {
-    const presenter = makeAutoObservable({
-      search: '',
-      count: 0,
+    class TwoWayStore {
+      search = ''
+      count = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       setSearch(value) {
         this.search = value
-      },
+      }
       
       increment() {
         this.count++
       }
-    })
+    }
+    
+    const presenter = new TwoWayStore()
 
     // Simulate two-way binding (what we want to achieve)
     const state = {}
@@ -48,14 +54,20 @@ describe('MobX-Vue Bridge - Binding Modes', () => {
   })
 
   it('should work in read-only mode', () => {
-    const presenter = makeAutoObservable({
-      search: '',
-      count: 0,
+    class ReadOnlyStore {
+      search = ''
+      count = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       setSearch(value) {
         this.search = value
       }
-    })
+    }
+    
+    const presenter = new ReadOnlyStore()
 
     const onDirectMutation = vi.fn()
 
@@ -87,8 +99,12 @@ describe('MobX-Vue Bridge - Binding Modes', () => {
   })
 
   it('should work in action-only mode', () => {
-    const presenter = makeAutoObservable({
-      search: '',
+    class ActionOnlyStore {
+      search = ''
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       setSearch(value) {
         // Add validation in action
@@ -97,7 +113,9 @@ describe('MobX-Vue Bridge - Binding Modes', () => {
         }
         this.search = value
       }
-    })
+    }
+    
+    const presenter = new ActionOnlyStore()
 
     const onDirectMutation = vi.fn()
 
@@ -134,10 +152,14 @@ describe('MobX-Vue Bridge - Binding Modes', () => {
   })
 
   it('should demonstrate the benefits of action-only mode', () => {
-    const presenter = makeAutoObservable({
-      userEmail: '',
-      userAge: 0,
-      userRole: 'user',
+    class UserStore {
+      userEmail = ''
+      userAge = 0
+      userRole = 'user'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateUser(userData) {
         // Validation in action
@@ -161,7 +183,9 @@ describe('MobX-Vue Bridge - Binding Modes', () => {
         if (userData.age !== undefined) this.userAge = userData.age
         if (userData.role) this.userRole = userData.role
       }
-    })
+    }
+    
+    const presenter = new UserStore()
 
     const onDirectMutation = vi.fn()
 
@@ -212,14 +236,18 @@ describe('MobX-Vue Bridge - Binding Modes', () => {
   })
 
   it('should demonstrate mixed mode usage', () => {
-    const presenter = makeAutoObservable({
+    class MixedModeStore {
       // Safe properties (can be mutated directly)
-      search: '',
-      modalOpen: false,
+      search = ''
+      modalOpen = false
       
       // Sensitive properties (should use actions)
-      userEmail: '',
-      userRole: 'user',
+      userEmail = ''
+      userRole = 'user'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       // Actions for sensitive properties
       updateUser(userData) {
@@ -229,7 +257,9 @@ describe('MobX-Vue Bridge - Binding Modes', () => {
         if (userData.email) this.userEmail = userData.email
         if (userData.role) this.userRole = userData.role
       }
-    })
+    }
+    
+    const presenter = new MixedModeStore()
 
     const onDirectMutation = vi.fn()
 

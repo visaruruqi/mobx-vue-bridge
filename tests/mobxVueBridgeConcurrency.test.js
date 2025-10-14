@@ -15,13 +15,19 @@ import { useMobxBridge } from '../mobxVueBridge.js'
 
 describe('MobX-Vue Bridge - Concurrent Updates & Race Conditions', () => {
   it('should handle rapid alternating Vue->MobX and MobX->Vue updates', async () => {
-    const presenter = makeAutoObservable({
-      counter: 0,
+    class CounterStore {
+      counter = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       increment() {
         this.counter++
       }
-    })
+    }
+    
+    const presenter = new CounterStore()
 
     const state = useMobxBridge(presenter, { allowDirectMutation: true })
     
@@ -64,22 +70,28 @@ describe('MobX-Vue Bridge - Concurrent Updates & Race Conditions', () => {
   })
 
   it('should prevent echo loops in circular update scenarios', () => {
-    const presenter = makeAutoObservable({
-      value: 0,
-      derived: 0,
+    class CircularStore {
+      value = 0
+      derived = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateValue(val) {
         this.value = val
         // This triggers derived update
         this.derived = val * 2
-      },
+      }
       
       updateDerived(val) {
         this.derived = val
         // This could trigger value update (circular dependency)
         this.value = val / 2
       }
-    })
+    }
+    
+    const presenter = new CircularStore()
 
     const state = useMobxBridge(presenter, { allowDirectMutation: true })
     
@@ -109,11 +121,15 @@ describe('MobX-Vue Bridge - Concurrent Updates & Race Conditions', () => {
   })
 
   it('should handle simultaneous updates to multiple properties', async () => {
-    const presenter = makeAutoObservable({
-      prop1: 'initial1',
-      prop2: 'initial2', 
-      prop3: 'initial3',
-      prop4: 'initial4',
+    class MultiPropStore {
+      prop1 = 'initial1'
+      prop2 = 'initial2'
+      prop3 = 'initial3'
+      prop4 = 'initial4'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateAll() {
         this.prop1 = 'updated1'
@@ -121,7 +137,9 @@ describe('MobX-Vue Bridge - Concurrent Updates & Race Conditions', () => {
         this.prop3 = 'updated3'
         this.prop4 = 'updated4'
       }
-    })
+    }
+    
+    const presenter = new MultiPropStore()
 
     const state = useMobxBridge(presenter, { allowDirectMutation: true })
     
@@ -165,15 +183,21 @@ describe('MobX-Vue Bridge - Concurrent Updates & Race Conditions', () => {
   })
 
   it('should handle rapid nested object mutations', async () => {
-    const presenter = makeAutoObservable({
-      nestedData: {
+    class NestedStore {
+      nestedData = {
         level1: {
           level2: {
             value: 'initial'
           }
         }
       }
-    })
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new NestedStore()
 
     const state = useMobxBridge(presenter)
     
@@ -201,17 +225,23 @@ describe('MobX-Vue Bridge - Concurrent Updates & Race Conditions', () => {
   })
 
   it('should handle concurrent array modifications', async () => {
-    const presenter = makeAutoObservable({
-      items: [1, 2, 3, 4, 5],
+    class ArrayStore {
+      items = [1, 2, 3, 4, 5]
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       addItem(item) {
         this.items.push(item)
-      },
+      }
       
       removeItem(index) {
         this.items.splice(index, 1)
       }
-    })
+    }
+    
+    const presenter = new ArrayStore()
 
     const state = useMobxBridge(presenter)
     
@@ -262,10 +292,14 @@ describe('MobX-Vue Bridge - Concurrent Updates & Race Conditions', () => {
   })
 
   it('should maintain consistency during async operations', async () => {
-    const presenter = makeAutoObservable({
-      isLoading: false,
-      data: null,
-      error: null,
+    class AsyncStore {
+      isLoading = false
+      data = null
+      error = null
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       async fetchData() {
         this.isLoading = true
@@ -286,7 +320,9 @@ describe('MobX-Vue Bridge - Concurrent Updates & Race Conditions', () => {
           })
         }
       }
-    })
+    }
+    
+    const presenter = new AsyncStore()
 
     const state = useMobxBridge(presenter)
     
@@ -309,11 +345,17 @@ describe('MobX-Vue Bridge - Concurrent Updates & Race Conditions', () => {
   })
 
   it('should handle updates during property enumeration', () => {
-    const presenter = makeAutoObservable({
-      prop1: 'value1',
-      prop2: 'value2',
-      prop3: 'value3'
-    })
+    class EnumerableStore {
+      prop1 = 'value1'
+      prop2 = 'value2'
+      prop3 = 'value3'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new EnumerableStore()
 
     const state = useMobxBridge(presenter, { allowDirectMutation: true })
     

@@ -29,12 +29,17 @@ import { nextTick } from 'vue'
 
 describe('MobX-Vue Bridge Two-Way Binding', () => {
   test('should sync Vue → MobX changes', () => {
-    const presenter = makeAutoObservable({
-      count: 0,
-      name: 'test',
-      isActive: false
-    })
+    class SimpleStore {
+      count = 0
+      name = 'test'
+      isActive = false
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
     
+    const presenter = new SimpleStore()
     const state = useMobxBridge(presenter)
     
     // Test Vue → MobX sync
@@ -49,11 +54,16 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
   })
 
   test('should sync MobX → Vue changes', () => {
-    const presenter = makeAutoObservable({
-      count: 0,
-      name: 'test'
-    })
+    class SimpleStore {
+      count = 0
+      name = 'test'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
     
+    const presenter = new SimpleStore()
     const state = useMobxBridge(presenter)
     
     // Test MobX → Vue sync
@@ -65,14 +75,19 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
   })
 
   test('should handle computed properties correctly', () => {
-    const presenter = makeAutoObservable({
-      count: 0,
+    class ComputedStore {
+      count = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       get doubled() {
         return this.count * 2
       }
-    })
+    }
     
+    const presenter = new ComputedStore()
     const state = useMobxBridge(presenter)
     
     
@@ -90,18 +105,23 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
   })
 
   test('should handle actions correctly', () => {
-    const presenter = makeAutoObservable({
-      count: 0,
+    class ActionStore {
+      count = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       increment() {
         this.count++
-      },
+      }
       
       setCount(value) {
         this.count = value
       }
-    })
+    }
     
+    const presenter = new ActionStore()
     const state = useMobxBridge(presenter)
     
     // Test action calls
@@ -115,13 +135,18 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
   })
 
   test('should handle nested objects', async () => {
-    const presenter = makeAutoObservable({
-      form: {
+    class FormStore {
+      form = {
         name: '',
         email: ''
       }
-    })
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
     
+    const presenter = new FormStore()
     const state = useMobxBridge(presenter)
     
     // Test nested object changes
@@ -137,10 +162,15 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
   })
 
   test('should handle arrays', async () => {
-    const presenter = makeAutoObservable({
-      items: []
-    })
+    class ArrayStore {
+      items = []
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
     
+    const presenter = new ArrayStore()
     const state = useMobxBridge(presenter)
     
     // Test array changes
@@ -156,11 +186,16 @@ describe('MobX-Vue Bridge Two-Way Binding', () => {
   })
 
   test('should verify array assignment and array push is working in two ways', async () => {
-    const presenter = makeAutoObservable({
-      count: 0,
-      items: []
-    })
+    class MixedStore {
+      count = 0
+      items = []
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
     
+    const presenter = new MixedStore()
     const state = useMobxBridge(presenter)
     
     // Test that the functionality works (markRaw is being called internally)

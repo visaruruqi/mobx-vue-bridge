@@ -9,10 +9,14 @@ import { makeAutoObservable } from 'mobx'
 
 describe('MobX-Vue Bridge - Safety and Architecture', () => {
   it('should demonstrate the risks of direct mutation', () => {
-    const presenter = makeAutoObservable({
-      userEmail: '',
-      userAge: 0,
-      userRole: 'user',
+    class RiskyStore {
+      userEmail = ''
+      userAge = 0
+      userRole = 'user'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       updateUser(userData) {
         // Validation in action
@@ -30,7 +34,9 @@ describe('MobX-Vue Bridge - Safety and Architecture', () => {
         if (userData.age !== undefined) this.userAge = userData.age
         if (userData.role) this.userRole = userData.role
       }
-    })
+    }
+    
+    const presenter = new RiskyStore()
 
     // Simulate direct mutation (what happens with two-way binding)
     const state = {}
@@ -80,10 +86,14 @@ describe('MobX-Vue Bridge - Safety and Architecture', () => {
   })
 
   it('should demonstrate safe two-way binding with validation', () => {
-    const presenter = makeAutoObservable({
-      search: '',
-      userEmail: '',
-      userAge: 0,
+    class SafeStore {
+      search = ''
+      userEmail = ''
+      userAge = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       setSearch(value) {
         // Simple validation for search
@@ -91,7 +101,7 @@ describe('MobX-Vue Bridge - Safety and Architecture', () => {
           throw new Error('Search term too long')
         }
         this.search = value
-      },
+      }
       
       updateUser(userData) {
         // Complex validation for user
@@ -104,7 +114,9 @@ describe('MobX-Vue Bridge - Safety and Architecture', () => {
         if (userData.email) this.userEmail = userData.email
         if (userData.age !== undefined) this.userAge = userData.age
       }
-    })
+    }
+    
+    const presenter = new SafeStore()
 
     const onDirectMutation = vi.fn()
 
@@ -165,16 +177,20 @@ describe('MobX-Vue Bridge - Safety and Architecture', () => {
   })
 
   it('should demonstrate the benefits of action-only mode for sensitive data', () => {
-    const presenter = makeAutoObservable({
+    class SensitiveDataStore {
       // Sensitive data that should never be mutated directly
-      userId: 1,
-      userEmail: 'user@example.com',
-      userRole: 'user',
-      userPermissions: ['read'],
+      userId = 1
+      userEmail = 'user@example.com'
+      userRole = 'user'
+      userPermissions = ['read']
       
       // Safe data that can be mutated directly
-      uiTheme: 'light',
-      sidebarOpen: false,
+      uiTheme = 'light'
+      sidebarOpen = false
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       // Actions for sensitive data
       updateUser(userData) {
@@ -195,7 +211,7 @@ describe('MobX-Vue Bridge - Safety and Architecture', () => {
         
         if (userData.email) this.userEmail = userData.email
         if (userData.role) this.userRole = userData.role
-      },
+      }
       
       promoteUser() {
         if (this.userRole === 'user') {
@@ -204,7 +220,9 @@ describe('MobX-Vue Bridge - Safety and Architecture', () => {
           console.log(`User ${this.userId} promoted to moderator`)
         }
       }
-    })
+    }
+    
+    const presenter = new SensitiveDataStore()
 
     const onDirectMutation = vi.fn()
 
@@ -269,15 +287,19 @@ describe('MobX-Vue Bridge - Safety and Architecture', () => {
   })
 
   it('should demonstrate configuration options for different environments', () => {
-    const presenter = makeAutoObservable({
-      search: '',
-      userEmail: '',
-      userRole: 'user',
+    class EnvironmentStore {
+      search = ''
+      userEmail = ''
+      userRole = 'user'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       setSearch(value) {
         if (value.length > 100) throw new Error('Search too long')
         this.search = value
-      },
+      }
       
       updateUser(userData) {
         if (userData.role && !['user', 'admin'].includes(userData.role)) {
@@ -286,7 +308,9 @@ describe('MobX-Vue Bridge - Safety and Architecture', () => {
         if (userData.email) this.userEmail = userData.email
         if (userData.role) this.userRole = userData.role
       }
-    })
+    }
+    
+    const presenter = new EnvironmentStore()
 
     // Development mode - allow direct mutation for rapid prototyping
     const devState = {}

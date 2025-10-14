@@ -25,10 +25,16 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should respect allowDirectMutation: false when explicitly set', () => {
-    const presenter = makeAutoObservable({
-      name: 'initial',
-      count: 0
-    })
+    class ConfigStore1 {
+      name = 'initial'
+      count = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new ConfigStore1()
 
     // Explicitly set allowDirectMutation to false
     const state = useMobxBridge(presenter, { allowDirectMutation: false })
@@ -49,10 +55,16 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should respect allowDirectMutation: true', () => {
-    const presenter = makeAutoObservable({
-      name: 'initial',
-      count: 0
-    })
+    class ConfigStore2 {
+      name = 'initial'
+      count = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new ConfigStore2()
 
     const state = useMobxBridge(presenter, { allowDirectMutation: true })
     
@@ -71,26 +83,32 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should handle mixed property types with allowDirectMutation: true', () => {
-    const presenter = makeAutoObservable({
-      regularProp: 'value',
-      _internalValue: 0,
+    class MixedStore {
+      regularProp = 'value'
+      _internalValue = 0
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
       
       get computedProp() {
         return this._internalValue * 2
-      },
+      }
       
       set writableProp(val) {
         this._internalValue = val
-      },
+      }
       
       get writableProp() {
         return this._internalValue
-      },
+      }
       
       actionMethod() {
         this._internalValue++
       }
-    })
+    }
+    
+    const presenter = new MixedStore()
 
     const state = useMobxBridge(presenter, { allowDirectMutation: true })
     
@@ -114,9 +132,15 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should handle usePresenterState alias correctly', () => {
-    const presenter = makeAutoObservable({
-      value: 'test'
-    })
+    class AliasStore {
+      value = 'test'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new AliasStore()
 
     // usePresenterState should work identically to useMobxBridge
     const state1 = useMobxBridge(presenter)
@@ -133,9 +157,15 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should handle empty options object', () => {
-    const presenter = makeAutoObservable({
-      prop: 'value'
-    })
+    class EmptyOptionsStore {
+      prop = 'value'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new EmptyOptionsStore()
 
     expect(() => {
       const state = useMobxBridge(presenter, {})
@@ -144,9 +174,15 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should handle null/undefined options', () => {
-    const presenter = makeAutoObservable({
-      prop: 'value'
-    })
+    class NullOptionsStore {
+      prop = 'value'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new NullOptionsStore()
 
     expect(() => {
       const state1 = useMobxBridge(presenter, null)
@@ -157,9 +193,15 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should handle unknown options gracefully', () => {
-    const presenter = makeAutoObservable({
-      prop: 'value'
-    })
+    class UnknownOptionsStore {
+      prop = 'value'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new UnknownOptionsStore()
 
     expect(() => {
       const state = useMobxBridge(presenter, {
@@ -176,9 +218,15 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should handle boolean coercion in options', () => {
-    const presenter = makeAutoObservable({
-      prop: 'value'
-    })
+    class BooleanCoercionStore {
+      prop = 'value'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new BooleanCoercionStore()
 
     // Test truthy values
     const state1 = useMobxBridge(presenter, { allowDirectMutation: 'true' })
@@ -205,9 +253,15 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should handle configuration changes after creation', () => {
-    const presenter = makeAutoObservable({
-      prop: 'initial'
-    })
+    class ConfigChangeStore {
+      prop = 'initial'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new ConfigChangeStore()
 
     // Start with readonly
     const state = useMobxBridge(presenter, { allowDirectMutation: false })
@@ -225,9 +279,15 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
 
   it('should provide appropriate defaults for different MobX patterns', () => {
     // Test with makeAutoObservable
-    const autoObservable = makeAutoObservable({
-      prop: 'auto'
-    })
+    class AutoObservableStore {
+      prop = 'auto'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const autoObservable = new AutoObservableStore()
     
     const state1 = useMobxBridge(autoObservable)
     expect(state1.prop).toBe('auto')
@@ -256,9 +316,15 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
   })
 
   it('should handle option validation edge cases', () => {
-    const presenter = makeAutoObservable({
-      prop: 'value'
-    })
+    class EdgeCaseStore {
+      prop = 'value'
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
+    }
+    
+    const presenter = new EdgeCaseStore()
 
     // Test with complex option objects
     const complexOptions = {

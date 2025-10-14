@@ -15,23 +15,27 @@ describe('MobX-Vue Bridge Reactivity Tests', () => {
 
   beforeEach(() => {
     // Create a presenter similar to CourseDetailsPresenter
-    presenter = makeAutoObservable({
-      courseId: null,
-      isLoading: false,
-      error: null,
-      courseRepository: {
+    class CoursePresenter {
+      courseId = null
+      isLoading = false
+      error = null
+      courseRepository = {
         courses: []
-      },
+      }
+      
+      constructor() {
+        makeAutoObservable(this)
+      }
 
       get course() {
         if (!this.courseId) return null
         return this.courseRepository.courses.find(c => c.id === this.courseId) || null
-      },
+      }
 
       get courseEnrollments() {
         if (!this.courseId) return []
         return [] // Simplified for testing
-      },
+      }
 
       async initialize(courseId) {
         this.courseId = courseId
@@ -50,8 +54,9 @@ describe('MobX-Vue Bridge Reactivity Tests', () => {
           this.isLoading = false
         }
       }
-    })
-
+    }
+    
+    presenter = new CoursePresenter()
     // Create the bridge
     state = useMobxBridge(presenter)
   })
