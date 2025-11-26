@@ -14,6 +14,8 @@ A seamless bridge between MobX observables and Vue 3's reactivity system, enabli
 - 🔒 **Type-safe bridging** between reactive systems
 - 🚀 **Optimized performance** with intelligent change detection
 - 🛡️ **Error handling** for edge cases and circular references
+- ⚡ **Zero-side-effect initialization** with lazy detection (v1.4.0+)
+- 📦 **Modular architecture** for better maintainability
 
 ## 📦 Installation
 
@@ -295,6 +297,51 @@ state.items.push(4)        // Batched (async - requires nextTick for immediate r
 presenter.items.push(newItem)
 console.log(presenter.items)  // Immediately updated!
 ```
+
+## 🏗️ Architecture & Implementation
+
+### Modular Design (v1.4.0+)
+
+The bridge uses a clean, modular architecture for better maintainability:
+
+```
+src/
+├── mobxVueBridge.js           # Main bridge (321 lines)
+└── utils/
+    ├── memberDetection.js     # MobX property categorization (210 lines)
+    ├── equality.js            # Deep equality with circular protection (47 lines)
+    └── deepProxy.js           # Nested reactivity with batching (109 lines)
+```
+
+### Zero-Side-Effect Initialization
+
+The bridge uses **lazy detection** to avoid calling setters during initialization:
+
+```javascript
+class GuestPresenter {
+  get currentRoom() {
+    return this.repository.currentRoomId
+  }
+  
+  set currentRoom(val) {
+    this.repository.currentRoomId = val
+    this.refreshDataOnTabChange()  // Side effect!
+  }
+}
+
+// ✅ v1.4.0+: No side effects during bridge creation
+const state = useMobxBridge(presenter)  // refreshDataOnTabChange() NOT called
+
+// ✅ Side effects only happen during actual mutations
+state.currentRoom = 'room-123'  // refreshDataOnTabChange() called here
+```
+
+**How it works:**
+1. **Detection phase**: Checks descriptor existence only (`descriptor.get && descriptor.set`)
+2. **First write**: Tests if setter actually works by attempting the write
+3. **Caching**: Results stored in `readOnlyDetected` Set for O(1) future lookups
+
+This prevents bugs where setter side effects were triggered during bridge setup, while maintaining accurate runtime behavior.
 
 ### Error Handling
 The bridge gracefully handles edge cases:

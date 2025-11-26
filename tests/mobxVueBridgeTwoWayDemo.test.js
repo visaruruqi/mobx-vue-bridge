@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { makeAutoObservable } from 'mobx'
+import { nextTick } from 'vue'
 import { useMobxBridge } from '../mobxVueBridge.js'
 
 /**
@@ -17,7 +18,7 @@ import { useMobxBridge } from '../mobxVueBridge.js'
  */
 
 describe('MobX-Vue Bridge Two-Way Binding - Documentation & Future Tests', () => {
-  it.skip('should demonstrate two-way binding with a real presenter-like object', () => {
+  it('should demonstrate two-way binding with a real presenter-like object', async () => {
     // SKIPPED: Requires Vue component context (onMounted/onUnmounted)
     // This test documents the expected behavior for future implementation
     
@@ -87,8 +88,8 @@ describe('MobX-Vue Bridge Two-Way Binding - Documentation & Future Tests', () =>
     // Test 5: Object properties
     const testItem = { id: 1, name: 'Test Item' }
     state.selected = testItem
-    expect(presenter.selected).toBe(testItem)
-    expect(state.selected).toBe(testItem)
+    expect(presenter.selected).toStrictEqual(testItem)  // Uses deep equality (cloned)
+    expect(state.selected).toStrictEqual(testItem)
 
     // Test 6: Computed properties (read-only)
     expect(presenter.hasSelection).toBe(true)
@@ -114,13 +115,14 @@ describe('MobX-Vue Bridge Two-Way Binding - Documentation & Future Tests', () =>
     // Test 8: Nested object properties
     state.form.name = 'John Doe'
     state.form.email = 'john@example.com'
+    await nextTick()  // Nested mutations are async (microtask batching)
     expect(presenter.form.name).toBe('John Doe')
     expect(presenter.form.email).toBe('john@example.com')
     expect(state.form.name).toBe('John Doe')
     expect(state.form.email).toBe('john@example.com')
   })
 
-  it.skip('should work with different property types', () => {
+  it('should work with different property types', () => {
     // SKIPPED: Requires Vue component context
     // This test documents expected behavior for different data types
     

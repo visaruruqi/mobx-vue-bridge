@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-11-25
+
+### 🎯 Major Improvements
+
+#### Zero-side-effect initialization with lazy detection
+- **Feature**: Bridge no longer calls any setters during initialization, eliminating all side effects
+- **Benefit**: Fixes production bugs where setter side effects (like `refreshDataOnTabChange()`) were triggered during bridge setup
+- **Mechanism**: Lazy detection pattern - properties are optimistically marked as writable during init, tested on first actual write attempt
+- **Caching**: `readOnlyDetected` Set caches detection results for O(1) lookups on subsequent writes
+- **Impact**: User's `currentRoom` setter with side effects now works correctly - side effects only occur during actual user interactions
+
+#### Modular architecture refactoring
+- **Feature**: Core logic separated into focused utility modules
+- **Structure**: 
+  - `src/utils/memberDetection.js` (210 lines) - MobX member categorization without side effects
+  - `src/utils/equality.js` (47 lines) - Deep equality with circular reference protection
+  - `src/utils/deepProxy.js` (109 lines) - Nested reactivity with microtask batching
+- **Main bridge**: Reduced from 523 lines → 321 lines (39% reduction)
+- **Benefit**: Better maintainability, testability, and code organization
+
+### 🐛 Bug Fixes
+
+#### Fixed computed property detection with MobX synthetic setters
+- **Issue**: MobX adds synthetic setters to computed-only properties that throw "not possible to assign" errors
+- **Previous approach**: Tested setters during initialization (caused side effects)
+- **New approach**: Check descriptor existence only (`descriptor.get && descriptor.set`), test lazily on first write
+- **Detection**: Catch MobX error message during first write attempt, cache as read-only
+- **Result**: Accurate detection without initialization side effects
+
+#### Fixed test equality assertions
+- **Issue**: One test expected reference equality for cloned objects
+- **Fix**: Changed `.toBe()` to `.toStrictEqual()` for deep equality comparison
+- **Context**: Bridge clones objects to prevent reference sharing between Vue and MobX
+
+### ✅ Testing
+
+- **Total tests**: 170 passing (was 168 + 2 skipped)
+- **New active tests**: Unskipped and fixed 2 comprehensive two-way binding demo tests
+- **Coverage**: All patterns verified including lazy detection, nested mutations, and error handling
+
+### 📚 Documentation
+
+- **Architecture notes**: Added inline documentation explaining lazy detection pattern
+- **Comments**: Clear explanation of why setters aren't called during init
+- **Examples**: Test files demonstrate proper usage patterns
+
 ## [1.2.0] - 2025-10-01
 
 ### ✨ New Features

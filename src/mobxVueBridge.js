@@ -1,7 +1,10 @@
 import { reactive, onUnmounted, ref } from 'vue';
-import { toJS, reaction, observe, isComputedProp, isObservableProp } from 'mobx';
+import { toJS, reaction, observe } from 'mobx';
 import { deepObserve } from 'mobx-utils';
 import clone from 'clone';
+import { categorizeMobxMembers } from './utils/memberDetection.js';
+import { isEqual } from './utils/equality.js';
+import { createDeepProxy } from './utils/deepProxy.js';
 
 /**
  * 🌉 MobX-Vue Bridge
@@ -49,247 +52,17 @@ export function useMobxBridge(mobxObject, options = {}) {
   
   const vueState = reactive({});
 
-  // Discover props/methods via MobX introspection (don’t rely on raw descriptors)
-  const props = Object.getOwnPropertyNames(mobxObject)
-    .concat(Object.getOwnPropertyNames(Object.getPrototypeOf(mobxObject)))
-    .filter(p => p !== 'constructor' && !p.startsWith('_'));
+  // Use the imported categorization function
+  const members = categorizeMobxMembers(mobxObject);
 
-  const members = {
-    getters: props.filter(p => {
-      try {
-        // First try to check if it's a computed property via MobX introspection
-        try {
-          return isComputedProp(mobxObject, p);
-        } catch (computedError) {
-          // If isComputedProp fails (e.g., due to uninitialized nested objects),
-          // fall back to checking if it has a getter descriptor
-          const descriptor = Object.getOwnPropertyDescriptor(mobxObject, p) || 
-                            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(mobxObject), p);
-          
-          // If it has a getter but no corresponding property, it's likely a computed getter
-          return descriptor && typeof descriptor.get === 'function' && 
-                 !isObservableProp(mobxObject, p);
-        }
-      } catch (error) {
-        return false;
-      }
-    }),
-    setters: props.filter(p => {
-      try {
-        // Check if it has a setter descriptor
-        const descriptor = Object.getOwnPropertyDescriptor(mobxObject, p) || 
-                          Object.getOwnPropertyDescriptor(Object.getPrototypeOf(mobxObject), p);
-        
-        // Must have a setter
-        if (!descriptor || typeof descriptor.set !== 'function') return false;
-        
-        // Exclude methods
-        if (typeof mobxObject[p] === 'function') return false;
-        
-        // For MobX objects with makeAutoObservable, we need to distinguish:
-        // 1. Regular observable properties (handled separately) 
-        // 2. Computed properties with setters (getter/setter pairs)
-        // 3. Setter-only properties
-        
-        // Include if it's a computed property with a WORKING setter (getter/setter pair)
-        try {
-          if (isComputedProp(mobxObject, p)) {
-            // For computed properties, test if the setter actually works
-            try {
-              const originalValue = mobxObject[p];
-              descriptor.set.call(mobxObject, originalValue); // Try to set to same value
-              return true; // Setter works, it's a getter/setter pair
-            } catch (setterError) {
-              return false; // Setter throws error, it's a computed-only property
-            }
-          }
-        } catch (error) {
-          // If isComputedProp fails, check if it has a getter and test the setter
-          if (descriptor.get) {
-            try {
-              // Try to get the current value and set it back
-              const currentValue = mobxObject[p];
-              descriptor.set.call(mobxObject, currentValue);
-              return true; // Setter works
-            } catch (setterError) {
-              return false; // Setter throws error
-            }
-          }
-        }
-        
-        // Include if it's NOT an observable property (setter-only or other cases)
-        if (!isObservableProp(mobxObject, p)) return true;
-        
-        // Exclude regular observable properties (they're handled separately)
-        return false;
-      } catch (error) {
-        return false;
-      }
-    }),
-    properties: props.filter(p => {
-      try {
-        // Check if it's an observable property
-        if (!isObservableProp(mobxObject, p)) return false;
-        
-        // Check if it's a function (method)
-        if (typeof mobxObject[p] === 'function') return false;
-        
-        // Check if it's a computed property - if so, it's a getter, not a property
-        const isComputed = isComputedProp(mobxObject, p);
-        if (isComputed) return false;
-        
-        return true; // Regular observable property
-      } catch (error) {
-        return false;
-      }
-    }),
-    methods: props.filter(p => {
-      try {
-        return typeof mobxObject[p] === 'function';
-      } catch (error) {
-        return false;
-      }
-    }),
-  };
-  
-
-  // ---- utils: guards + equality --------------------------------------------
+  // ---- utils: guards -------------------------------------------------------
   const updatingFromMobx = new Set();
   const updatingFromVue = new Set();
-
-  /**
-   * Deep equality comparison with circular reference protection.
-   * Uses WeakSet to track visited objects and prevent infinite recursion.
-   * 
-   * @param {any} a - First value to compare
-   * @param {any} b - Second value to compare  
-   * @param {WeakSet} visited - Set of visited objects to prevent circular references
-   * @returns {boolean} True if values are deeply equal
-   */
-  const isEqual = (a, b, visited = new WeakSet()) => {
-    if (Object.is(a, b)) return true;
-    
-    // Handle null/undefined cases
-    if (a == null || b == null) return a === b;
-    
-    // Different types are not equal
-    if (typeof a !== typeof b) return false;
-    
-    // For primitives, Object.is should have caught them
-    if (typeof a !== 'object') return false;
-    
-    // Check for circular references
-    if (visited.has(a)) return true;
-    visited.add(a);
-    
-    // Fast array comparison
-    if (Array.isArray(a) && Array.isArray(b)) {
-      if (a.length !== b.length) return false;
-      return a.every((val, i) => isEqual(val, b[i], visited));
-    }
-    
-    // Fast object comparison - check keys first
-    const aKeys = Object.keys(a);
-    const bKeys = Object.keys(b);
-    if (aKeys.length !== bKeys.length) return false;
-    
-    // Check if all keys match
-    if (!aKeys.every(key => bKeys.includes(key))) return false;
-    
-    // Check values (recursive)
-    return aKeys.every(key => isEqual(a[key], b[key], visited));
-  };
 
   // Warning helpers to reduce duplication
   const warnDirectMutation = (prop) => console.warn(`Direct mutation of '${prop}' is disabled`);
   const warnSetterMutation = (prop) => console.warn(`Direct mutation of setter '${prop}' is disabled`);
   const warnMethodAssignment = (prop) => console.warn(`Cannot assign to method '${prop}'`);
-
-  /**
-   * Creates a deep proxy for nested objects/arrays to handle mutations at any level.
-   * This enables mutations like state.items.push(item) to work correctly.
-   * Respects the allowDirectMutation configuration for all nesting levels.
-   * 
-   * Note: Mutations are batched via queueMicrotask to prevent corruption during 
-   * array operations like shift(), unshift(), splice() which modify multiple indices.
-   * This ensures data correctness at the cost of a microtask delay.
-   * 
-   * IMPORTANT: The proxy wraps the value stored in propertyRefs[prop].value, which is
-   * a clone. When nested mutations occur, we update the clone in-place, then trigger
-   * a sync back to MobX by re-assigning the entire cloned structure.
-   * 
-   * @param {object|array} value - The nested value to wrap in a proxy
-   * @param {string} prop - The parent property name for error messages and sync
-   * @param {function} getRoot - Function that returns the current root value from propertyRef
-   * @returns {Proxy} Proxied object/array with reactive mutation handling
-   */
-  const createDeepProxy = (value, prop, getRoot = null) => {
-    // Don't proxy built-in objects that should remain unchanged
-    if (value instanceof Date || value instanceof RegExp || value instanceof Map || 
-        value instanceof Set || value instanceof WeakMap || value instanceof WeakSet) {
-      return value;
-    }
-
-    // If no getRoot provided, use the default which gets from propertyRefs
-    if (!getRoot) {
-      getRoot = () => propertyRefs[prop].value;
-    }
-
-    // Track pending updates to batch array mutations
-    let updatePending = false;
-    
-    return new Proxy(value, {
-      get: (target, key) => {
-        const result = target[key];
-        // If the result is an object/array, wrap it in a proxy too (but not built-ins)
-        if (result && typeof result === 'object' && 
-            !(result instanceof Date || result instanceof RegExp || result instanceof Map || 
-              result instanceof Set || result instanceof WeakMap || result instanceof WeakSet)) {
-          return createDeepProxy(result, prop, getRoot);
-        }
-        return result;
-      },
-      set: (target, key, val) => {
-        // Check if direct mutation is allowed
-        if (!allowDirectMutation) {
-          warnDirectMutation(`${prop}.${String(key)}`);
-          return true; // Must return true to avoid TypeError in strict mode
-        }
-        
-        // Update the target in-place (this modifies the clone in propertyRefs[prop].value)
-        target[key] = val;
-        
-        // Batch updates to avoid corrupting in-progress array operations
-        // like shift(), unshift(), splice() which modify multiple indices synchronously
-        if (!updatePending) {
-          updatePending = true;
-          queueMicrotask(() => {
-            updatePending = false;
-            // The root value has already been modified in-place above (target[key] = val)
-            // Now we need to trigger Vue reactivity and sync to MobX
-            
-            // Clone the root to create a new reference for Vue reactivity
-            // This ensures Vue detects the change
-            const rootValue = getRoot();
-            const cloned = clone(rootValue);
-            
-            // Update the Vue ref to trigger reactivity
-            propertyRefs[prop].value = cloned;
-            
-            // Update MobX immediately with the cloned value
-            updatingFromVue.add(prop);
-            try {
-              mobxObject[prop] = cloned;
-            } finally {
-              updatingFromVue.delete(prop);
-            }
-          });
-        }
-        
-        return true;
-      }
-    });
-  };
 
   // ---- properties (two-way) -------------------------------------------------
   const propertyRefs = {};
@@ -302,7 +75,15 @@ export function useMobxBridge(mobxObject, options = {}) {
         const value = propertyRefs[prop].value;
         // For objects/arrays, return a deep proxy that syncs mutations back
         if (value && typeof value === 'object') {
-          return createDeepProxy(value, prop);
+          return createDeepProxy(
+            value, 
+            prop, 
+            () => propertyRefs[prop].value,
+            allowDirectMutation,
+            updatingFromVue,
+            mobxObject,
+            propertyRefs
+          );
         }
         return value;
       },
@@ -333,13 +114,15 @@ export function useMobxBridge(mobxObject, options = {}) {
   // ---- getters and setters (handle both computed and two-way binding) ------
   const getterRefs = {};
   const setterRefs = {};
+  const readOnlyDetected = new Set(); // Track properties detected as read-only on first write
 
   // First, handle properties that have BOTH getters and setters (getter/setter pairs)
   const getterSetterPairs = members.getters.filter(prop => members.setters.includes(prop));
   const gettersOnly = members.getters.filter(prop => !members.setters.includes(prop));
   const settersOnly = members.setters.filter(prop => !members.getters.includes(prop));
 
-  // Getter/setter pairs: writable with reactive updates
+  // Getter/setter pairs: potentially writable with reactive updates
+  // Note: Some may have MobX synthetic setters that throw - we detect this lazily on first write
   getterSetterPairs.forEach(prop => {
     // Get initial value from getter
     let initialValue;
@@ -349,20 +132,31 @@ export function useMobxBridge(mobxObject, options = {}) {
       initialValue = undefined;
     }
     getterRefs[prop] = ref(initialValue);
-    setterRefs[prop] = ref(initialValue);
 
     Object.defineProperty(vueState, prop, {
+      // ALWAYS read from MobX so computed properties work correctly
       get: () => getterRefs[prop].value,
       set: allowDirectMutation
         ? (value) => {
-            // Update both refs
-            setterRefs[prop].value = value;
-            // Call the MobX setter immediately
+            // Check if we've already detected this as read-only
+            if (readOnlyDetected.has(prop)) {
+              throw new Error(`Cannot assign to computed property '${prop}'`);
+            }
+            
+            // Try to call the MobX setter (first write test)
             updatingFromVue.add(prop);
             try {
               mobxObject[prop] = value;
               // The getter ref will be updated by the reaction
             } catch (error) {
+              // Check if it's a MobX "not possible to assign" error (synthetic setter)
+              if (error.message && error.message.includes('not possible to assign')) {
+                // Mark as read-only so we don't try again
+                readOnlyDetected.add(prop);
+                // This is actually a read-only computed property
+                throw new Error(`Cannot assign to computed property '${prop}'`);
+              }
+              // For other errors (validation, side effects), just warn
               console.warn(`Failed to set property '${prop}':`, error);
             } finally {
               updatingFromVue.delete(prop);
@@ -520,9 +314,11 @@ export function useMobxBridge(mobxObject, options = {}) {
       try {
         if (typeof unsub === 'function') {
           unsub();
+        } else if (typeof unsub?.dispose === 'function') {
+          unsub.dispose();
         }
-      } catch {
-        // Silently ignore cleanup errors
+      } catch (error) {
+        // Silently handle cleanup errors
       }
     });
   });
@@ -531,12 +327,7 @@ export function useMobxBridge(mobxObject, options = {}) {
 }
 
 /**
- * Helper alias for useMobxBridge - commonly used with presenter objects
- * 
- * @param {object} presenter - The MobX presenter object to bridge
- * @param {object} options - Configuration options
- * @returns {object} Vue reactive state object
+ * Alias for useMobxBridge - for users who prefer "presenter" terminology
+ * @alias useMobxBridge
  */
-export function usePresenterState(presenter, options = {}) {
-  return useMobxBridge(presenter, options);
-}
+export const usePresenterState = useMobxBridge;

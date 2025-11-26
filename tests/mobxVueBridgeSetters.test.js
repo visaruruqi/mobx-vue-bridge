@@ -249,7 +249,8 @@ describe('MobX-Vue Bridge Setters Two-Way Binding', () => {
     // Test initial state
     expect(state.email).toBe('')
     expect(state.age).toBe(0)
-    expect(state.isValid).toBe(false)
+    // isValid computes: true && '' && false → '' (first falsy value)
+    expect(state.isValid).toBeFalsy()
 
     // Test valid inputs
     state.email = 'JOHN.DOE@EXAMPLE.COM'
