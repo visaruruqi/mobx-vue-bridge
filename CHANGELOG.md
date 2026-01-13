@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-01-13
+
+### 🎯 Major Improvements
+
+#### Declarative helper functions for improved readability
+- **Feature**: Extracted bridge logic into self-documenting helper functions in `src/utils/helpers.js`
+- **Structure**: 396 lines of declarative helpers organized by concern:
+  - Value reading & initialization
+  - Property type categorization
+  - Echo loop prevention
+  - Read-only detection
+  - Setter creation (lazy validated, read-only, write-only, two-way binding)
+  - MobX observation helpers
+- **Benefit**: Code now reads like documentation with function names like `guardAgainstEchoLoop`, `createLazyValidatedSetter`, `safelyDisposeSubscription`
+
+#### Improved circular reference handling in equality checks
+- **Feature**: `isEqual()` now uses `Map` instead of `WeakSet` to track visited object pairs
+- **Benefit**: Correctly compares objects where one has circular refs and the other doesn't
+- **Previous bug**: `isEqual(circularObj, nonCircularObj)` incorrectly returned `true`
+- **Fix**: Now tracks `(a, b)` pairs so revisiting `a` checks if it was paired with same `b`
+
+### 🐛 Bug Fixes
+
+#### Fixed deepObserve stale subscription after property reassignment
+- **Issue**: When a property was reassigned to a new object/array, `deepObserve` continued watching the old value
+- **Example**: After `store.items = newArray`, mutations to `newArray` weren't detected
+- **Fix**: Added `onValueChanged` callback to `observeProperty` that re-subscribes `deepObserve` when property value changes
+- **Result**: Nested mutations are now correctly detected even after complete property reassignment
+
+#### Fixed -0 vs +0 edge case in equality comparison
+- **Issue**: `Object.is(-0, +0)` returns `false`, causing unnecessary updates for equivalent values
+- **Fix**: Added explicit number handling that treats `-0` and `+0` as equal while correctly handling `NaN === NaN`
+
+#### Improved warning messages
+- **Change**: Direct mutation warnings now include actionable guidance
+- **Before**: `"Direct mutation of 'name' is disabled"`
+- **After**: `"Direct mutation of 'name' is disabled. Use actions instead."`
+
+### ✅ Testing
+
+- **New test file**: `mobxVueBridgeBugVerification.test.js` - 10 tests verifying bug fixes
+  - Circular reference equality edge cases
+  - DeepObserve re-subscription after reassignment
+  - -0/+0 and NaN handling
+  - Single clone correctness
+  - Sibling nested array mutations
+  - Setter-only properties
+- **New test file**: `mobxVueBridgeCrossClassComputed.test.js` - 3 tests for cross-class dependencies
+  - Computed properties depending on other class's computed properties
+  - Chain of three classes with computed dependencies
+  - Changes detected even when only bridging the dependent class
+
 ## [1.4.0] - 2025-11-25
 
 ### 🎯 Major Improvements

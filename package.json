@@ -1,6 +1,6 @@
 {
   "name": "mobx-vue-bridge",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "A lightweight bridge for seamless two-way data binding between MobX observables and Vue 3 reactivity",
   "main": "src/mobxVueBridge.js",
   "module": "src/mobxVueBridge.js",
