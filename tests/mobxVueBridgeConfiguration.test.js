@@ -44,8 +44,8 @@ describe('MobX-Vue Bridge - Configuration & Options', () => {
     state.count = 10
     
     // Should warn about blocked mutations
-    expect(consoleWarnSpy).toHaveBeenCalledWith("Direct mutation of 'name' is disabled")
-    expect(consoleWarnSpy).toHaveBeenCalledWith("Direct mutation of 'count' is disabled")
+    expect(consoleWarnSpy).toHaveBeenCalledWith("Direct mutation of 'name' is disabled. Use actions instead.")
+    expect(consoleWarnSpy).toHaveBeenCalledWith("Direct mutation of 'count' is disabled. Use actions instead.")
     
     // Values should remain unchanged
     expect(state.name).toBe('initial')

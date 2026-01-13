@@ -5,6 +5,23 @@ import clone from 'clone';
 import { categorizeMobxMembers } from './utils/memberDetection.js';
 import { isEqual } from './utils/equality.js';
 import { createDeepProxy } from './utils/deepProxy.js';
+import {
+  safelyReadInitialValue,
+  createReactiveRef,
+  separateGetterSetterPairs,
+  findGettersOnly,
+  findSettersOnly,
+  defineReactiveProperty,
+  createLazyValidatedSetter,
+  createReadOnlySetter,
+  createWriteOnlySetter,
+  createTwoWayBindingSetter,
+  isCurrentlyUpdating,
+  observeProperty,
+  deepObserveProperty,
+  observeGetter,
+  safelyDisposeSubscription,
+} from './utils/helpers.js';
 
 /**
  * 🌉 MobX-Vue Bridge
@@ -60,267 +77,185 @@ export function useMobxBridge(mobxObject, options = {}) {
   const updatingFromVue = new Set();
 
   // Warning helpers to reduce duplication
-  const warnDirectMutation = (prop) => console.warn(`Direct mutation of '${prop}' is disabled`);
-  const warnSetterMutation = (prop) => console.warn(`Direct mutation of setter '${prop}' is disabled`);
   const warnMethodAssignment = (prop) => console.warn(`Cannot assign to method '${prop}'`);
 
-  // ---- properties (two-way) -------------------------------------------------
+  // ---- Bridge observable properties (two-way binding) ----
   const propertyRefs = {};
   
-  members.properties.forEach(prop => {
-    propertyRefs[prop] = ref(toJS(mobxObject[prop]));
+  const bridgeObservableProperty = (propertyName) => {
+    propertyRefs[propertyName] = createReactiveRef(toJS(mobxObject[propertyName]));
 
-    Object.defineProperty(vueState, prop, {
-      get: () => {
-        const value = propertyRefs[prop].value;
-        // For objects/arrays, return a deep proxy that syncs mutations back
-        if (value && typeof value === 'object') {
-          return createDeepProxy(
-            value, 
-            prop, 
-            () => propertyRefs[prop].value,
-            allowDirectMutation,
-            updatingFromVue,
-            mobxObject,
-            propertyRefs
-          );
-        }
-        return value;
-      },
-      set: allowDirectMutation
-        ? (value) => {
-            // Update Vue ref
-            const cloned = clone(value);
-            if (!isEqual(propertyRefs[prop].value, cloned)) {
-              propertyRefs[prop].value = cloned;
-            }
-            // ALSO update MobX immediately (synchronous)
-            if (!isEqual(mobxObject[prop], cloned)) {
-              updatingFromVue.add(prop);
-              try {
-                mobxObject[prop] = cloned;
-              } finally {
-                updatingFromVue.delete(prop);
-              }
-            }
-          }
-        : () => warnDirectMutation(prop),
-      enumerable: true,
-      configurable: true,
+    const createDeepProxyForValue = (value) => {
+      if (value && typeof value === 'object') {
+        return createDeepProxy(
+          value, 
+          propertyName, 
+          () => propertyRefs[propertyName].value,
+          allowDirectMutation,
+          updatingFromVue,
+          mobxObject,
+          propertyRefs
+        );
+      }
+      return value;
+    };
+
+    defineReactiveProperty(vueState, propertyName, {
+      get: () => createDeepProxyForValue(propertyRefs[propertyName].value),
+      set: createTwoWayBindingSetter({
+        propertyName,
+        target: mobxObject,
+        allowDirectMutation,
+        guardSet: updatingFromVue,
+        propertyRef: propertyRefs[propertyName],
+        // No deepProxyCreator needed - createTwoWayBindingSetter already clones the value
+      }),
     });
+  };
 
-  });
+  members.properties.forEach(bridgeObservableProperty);
 
   // ---- getters and setters (handle both computed and two-way binding) ------
   const getterRefs = {};
   const setterRefs = {};
   const readOnlyDetected = new Set(); // Track properties detected as read-only on first write
 
-  // First, handle properties that have BOTH getters and setters (getter/setter pairs)
-  const getterSetterPairs = members.getters.filter(prop => members.setters.includes(prop));
-  const gettersOnly = members.getters.filter(prop => !members.setters.includes(prop));
-  const settersOnly = members.setters.filter(prop => !members.getters.includes(prop));
+  // Categorize properties by their getter/setter combinations
+  const getterSetterPairs = separateGetterSetterPairs(members.getters, members.setters);
+  const gettersOnly = findGettersOnly(members.getters, members.setters);
+  const settersOnly = findSettersOnly(members.setters, members.getters);
 
-  // Getter/setter pairs: potentially writable with reactive updates
+  // ---- Bridge getter/setter pairs (potentially writable computed properties) ----
   // Note: Some may have MobX synthetic setters that throw - we detect this lazily on first write
-  getterSetterPairs.forEach(prop => {
-    // Get initial value from getter
-    let initialValue;
-    try {
-      initialValue = toJS(mobxObject[prop]);
-    } catch (error) {
-      initialValue = undefined;
-    }
-    getterRefs[prop] = ref(initialValue);
+  const bridgeGetterSetterPair = (propertyName) => {
+    const initialValue = safelyReadInitialValue(mobxObject, propertyName);
+    getterRefs[propertyName] = createReactiveRef(initialValue);
 
-    Object.defineProperty(vueState, prop, {
-      // ALWAYS read from MobX so computed properties work correctly
-      get: () => getterRefs[prop].value,
-      set: allowDirectMutation
-        ? (value) => {
-            // Check if we've already detected this as read-only
-            if (readOnlyDetected.has(prop)) {
-              throw new Error(`Cannot assign to computed property '${prop}'`);
-            }
-            
-            // Try to call the MobX setter (first write test)
-            updatingFromVue.add(prop);
-            try {
-              mobxObject[prop] = value;
-              // The getter ref will be updated by the reaction
-            } catch (error) {
-              // Check if it's a MobX "not possible to assign" error (synthetic setter)
-              if (error.message && error.message.includes('not possible to assign')) {
-                // Mark as read-only so we don't try again
-                readOnlyDetected.add(prop);
-                // This is actually a read-only computed property
-                throw new Error(`Cannot assign to computed property '${prop}'`);
-              }
-              // For other errors (validation, side effects), just warn
-              console.warn(`Failed to set property '${prop}':`, error);
-            } finally {
-              updatingFromVue.delete(prop);
-            }
-          }
-        : () => warnDirectMutation(prop),
-      enumerable: true,
-      configurable: true,
+    defineReactiveProperty(vueState, propertyName, {
+      get: () => getterRefs[propertyName].value,
+      set: createLazyValidatedSetter({
+        propertyName,
+        target: mobxObject,
+        allowDirectMutation,
+        readOnlySet: readOnlyDetected,
+        guardSet: updatingFromVue,
+      }),
     });
-  });
+  };
 
-  // Getter-only properties: read-only computed
-  gettersOnly.forEach(prop => {
-    // Safely get initial value of computed property, handle errors gracefully
-    let initialValue;
-    try {
-      initialValue = toJS(mobxObject[prop]);
-    } catch (error) {
-      // If computed property throws during initialization (e.g., accessing null.property),
-      // set initial value to undefined and let the reaction handle updates later
-      initialValue = undefined;
-    }
-    getterRefs[prop] = ref(initialValue);
+  getterSetterPairs.forEach(bridgeGetterSetterPair);
 
-    Object.defineProperty(vueState, prop, {
-      get: () => getterRefs[prop].value,
-      set: () => {
-        throw new Error(`Cannot assign to computed property '${prop}'`)
-      },
-      enumerable: true,
-      configurable: true,
+  // ---- Bridge getter-only properties (read-only computed) ----
+  const bridgeGetterOnly = (propertyName) => {
+    const initialValue = safelyReadInitialValue(mobxObject, propertyName);
+    getterRefs[propertyName] = createReactiveRef(initialValue);
+
+    defineReactiveProperty(vueState, propertyName, {
+      get: () => getterRefs[propertyName].value,
+      set: createReadOnlySetter(propertyName),
     });
-  });
+  };
 
-  // Setter-only properties: write-only
-  settersOnly.forEach(prop => {
-    // For setter-only properties, track the last set value
-    setterRefs[prop] = ref(undefined);
+  gettersOnly.forEach(bridgeGetterOnly);
 
-    Object.defineProperty(vueState, prop, {
-      get: () => setterRefs[prop].value,
-      set: allowDirectMutation
-        ? (value) => {
-            // Update the setter ref
-            setterRefs[prop].value = value;
-            
-            // Call the MobX setter immediately
-            updatingFromVue.add(prop);
-            try {
-              mobxObject[prop] = value;
-            } catch (error) {
-              console.warn(`Failed to set property '${prop}':`, error);
-            } finally {
-              updatingFromVue.delete(prop);
-            }
-          }
-        : () => warnSetterMutation(prop),
-      enumerable: true,
-      configurable: true,
+  // ---- Bridge setter-only properties (write-only) ----
+  const bridgeSetterOnly = (propertyName) => {
+    setterRefs[propertyName] = createReactiveRef(undefined);
+
+    defineReactiveProperty(vueState, propertyName, {
+      get: () => setterRefs[propertyName].value,
+      set: createWriteOnlySetter({
+        propertyName,
+        target: mobxObject,
+        allowDirectMutation,
+        guardSet: updatingFromVue,
+        setterRef: setterRefs[propertyName],
+      }),
     });
-  });
+  };
 
-  // ---- methods (bound) ------------------------------------------------------
-  members.methods.forEach(prop => {
+  settersOnly.forEach(bridgeSetterOnly);
+
+  // ---- Bridge methods (bound to MobX context) ----
+  const bridgeMethod = (methodName) => {
     // Cache the bound method to avoid creating new functions on every access
-    const boundMethod = mobxObject[prop].bind(mobxObject);
-    Object.defineProperty(vueState, prop, {
+    const boundMethod = mobxObject[methodName].bind(mobxObject);
+    
+    defineReactiveProperty(vueState, methodName, {
       get: () => boundMethod,
-      set: () => warnMethodAssignment(prop),
-      enumerable: true,
-      configurable: true,
+      set: () => warnMethodAssignment(methodName),
     });
-  });
+  };
+
+  members.methods.forEach(bridgeMethod);
 
   // ---- MobX → Vue: property observation ----------------------------------------
   const subscriptions = [];
+  const deepObserveSubscriptions = {}; // Track deep observe subs per property for re-subscription
 
-  setupStandardPropertyObservers();
+  setupPropertyObservation();
+  setupGetterObservation();
 
-  // Standard property observation implementation
-  function setupStandardPropertyObservers() {
-    // Use individual observe for each property to avoid circular reference issues
-    members.properties.forEach(prop => {
-      try {
-        const sub = observe(mobxObject, prop, (change) => {
-          if (!propertyRefs[prop]) return;
-          if (updatingFromVue.has(prop)) return; // avoid echo
-          updatingFromMobx.add(prop);
-          try {
-            const next = toJS(mobxObject[prop]);
-            if (!isEqual(propertyRefs[prop].value, next)) {
-              propertyRefs[prop].value = next;
-            }
-          } finally {
-            updatingFromMobx.delete(prop);
-          }
-        });
-        subscriptions.push(sub);
-      } catch (error) {
-        // Silently ignore non-observable properties
-      }
-    });
-
-    // For nested objects and arrays, use deepObserve to handle deep changes
-    // This handles both object properties and array mutations
-    members.properties.forEach(prop => {
-      const value = mobxObject[prop];
-      if (value && typeof value === 'object') { // Include both objects AND arrays
-        try {
-          const sub = deepObserve(value, (change, path) => {
-            if (!propertyRefs[prop]) return;
-            if (updatingFromVue.has(prop)) return; // avoid echo
-            updatingFromMobx.add(prop);
-            try {
-              const next = toJS(mobxObject[prop]);
-              if (!isEqual(propertyRefs[prop].value, next)) {
-                propertyRefs[prop].value = next;
-              }
-            } finally {
-              updatingFromMobx.delete(prop);
-            }
-          });
-          subscriptions.push(sub);
-        } catch (error) {
-          // Silently ignore if deepObserve fails (e.g., circular references in nested objects)
+  // Observe observable properties for MobX → Vue sync
+  function setupPropertyObservation() {
+    members.properties.forEach(propertyName => {
+      // Helper to setup/re-setup deep observation for a value
+      const setupDeepObserve = (value) => {
+        // Dispose existing deep observe subscription if any
+        if (deepObserveSubscriptions[propertyName]) {
+          safelyDisposeSubscription(deepObserveSubscriptions[propertyName]);
+          deepObserveSubscriptions[propertyName] = null;
         }
-      }
+        
+        // Only deep observe objects and arrays
+        if (!value || typeof value !== 'object') {
+          return;
+        }
+
+        const deepObserveSub = deepObserveProperty({
+          target: mobxObject,
+          propertyName,
+          refToUpdate: propertyRefs[propertyName],
+          echoGuard: updatingFromVue,
+          updateGuard: updatingFromMobx,
+        });
+        if (deepObserveSub) {
+          deepObserveSubscriptions[propertyName] = deepObserveSub;
+          subscriptions.push(deepObserveSub);
+        }
+      };
+
+      // Observe direct property changes
+      const observeSub = observeProperty({
+        target: mobxObject,
+        propertyName,
+        refToUpdate: propertyRefs[propertyName],
+        echoGuard: updatingFromVue,
+        updateGuard: updatingFromMobx,
+        onValueChanged: setupDeepObserve, // Re-subscribe deepObserve when value changes
+      });
+      if (observeSub) subscriptions.push(observeSub);
+
+      // Initial deep observe setup
+      setupDeepObserve(mobxObject[propertyName]);
     });
   }
 
-  // Getters: keep them in sync via reaction (both getter-only and getter/setter pairs)
-  [...gettersOnly, ...getterSetterPairs].forEach(prop => {
-    const sub = reaction(
-      () => {
-        try {
-          return toJS(mobxObject[prop]);
-        } catch (error) {
-          // If computed property throws (e.g., accessing null.property), return undefined
-          return undefined;
-        }
-      },
-      (next) => {
-        if (!getterRefs[prop]) return;
-        if (!isEqual(getterRefs[prop].value, next)) {
-          getterRefs[prop].value = next;
-        }
-      }
-    );
-    subscriptions.push(sub);
-  });
-
-  // Cleanup
-  onUnmounted(() => {
-    subscriptions.forEach(unsub => {
-      try {
-        if (typeof unsub === 'function') {
-          unsub();
-        } else if (typeof unsub?.dispose === 'function') {
-          unsub.dispose();
-        }
-      } catch (error) {
-        // Silently handle cleanup errors
-      }
+  // Observe computed properties (getters) for MobX → Vue sync
+  function setupGetterObservation() {
+    [...gettersOnly, ...getterSetterPairs].forEach(propertyName => {
+      const reactionSub = observeGetter({
+        target: mobxObject,
+        propertyName,
+        refToUpdate: getterRefs[propertyName],
+      });
+      subscriptions.push(reactionSub);
     });
+  }
+
+  // Cleanup subscriptions when component unmounts
+  onUnmounted(() => {
+    subscriptions.forEach(safelyDisposeSubscription);
   });
 
   return vueState;
