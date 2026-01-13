@@ -81,7 +81,7 @@ describe('MobX-Vue Bridge - Type Safety & Data Conversion', () => {
     
     // Test that Date objects maintain their prototype and methods
     expect(typeof state.dateProperty.getFullYear).toBe('function')
-    expect(state.dateProperty.toString()).toContain('2025') // Current year
+    expect(state.dateProperty.getFullYear()).toBe(now.getFullYear()) // Dynamic year check
   })
 
   it('should handle RegExp objects correctly', () => {
